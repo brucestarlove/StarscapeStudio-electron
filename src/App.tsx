@@ -5,7 +5,6 @@ import { LeftRail } from "@/components/LeftRail";
 import { LeftPane } from "@/components/LeftPane/LeftPane";
 import { Stage } from "@/components/Stage/Stage";
 import { TimelineDock } from "@/components/Timeline/TimelineDock";
-import { DebugPanel } from "@/components/DebugPanel";
 import { useProjectStore } from "@/store/projectStore";
 import type { DragItem } from "@/types";
 import "./globals.css";
@@ -93,7 +92,6 @@ function App() {
             <TimelineDock />
           </div>
         </div>
-        {import.meta.env.DEV && <DebugPanel />}
       </DndContext>
     </div>
   );

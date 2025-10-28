@@ -34,7 +34,7 @@ export function Ruler() {
   const markers = generateMarkers();
 
   return (
-    <div className="h-full relative bg-gradient-to-b from-mid-navy/90 to-dark-navy/90 border-b border-white/10">
+    <div className="h-full relative bg-gradient-to-b from-mid-navy/90 to-dark-navy/90 min-w-[6000px]">
       {/* Time markers */}
       {markers.map((marker) => (
         <div
