@@ -22,8 +22,10 @@ This is the technical implementation guide featuring:
 - Troubleshooting guide
 
 # MCPs
-- [tauri-27oct25.md](mcp/tauri-27oct25.md)
+- [electron-27oct25.md](mcp/electron-27oct25.md)
 - [zustand-27oct25.md](mcp/zustand-27oct25.md)
+- [tailwindcss-27oct25.md](mcp/tailwindcss-27oct25.md)
+- [vite-27oct25.md](mcp/vite-27oct25.md)
 
 # Plans
 - [000-Gauntlet-ClipForge.md](plans/000-Gauntlet-ClipForge.md) (project overview and requirements)

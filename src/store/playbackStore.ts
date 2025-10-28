@@ -101,34 +101,5 @@ export const usePlaybackStore = create<PlaybackStore>()((set) => ({
   },
 }));
 
-// Animation frame loop for playback
-let animationFrameId: number | null = null;
-
-export const startPlaybackLoop = () => {
-  if (animationFrameId) return;
-  
-  const loop = () => {
-    const { playing, currentTimeMs } = usePlaybackStore.getState();
-    
-    if (playing) {
-      // Update time (assuming 30fps for MVP)
-      usePlaybackStore.getState().seek(currentTimeMs + (1000 / 30));
-      
-      // Check if we've reached the end (placeholder logic)
-      if (currentTimeMs >= 60000) { // 1 minute placeholder
-        usePlaybackStore.getState().pause();
-      }
-    }
-    
-    animationFrameId = requestAnimationFrame(loop);
-  };
-  
-  animationFrameId = requestAnimationFrame(loop);
-};
-
-export const stopPlaybackLoop = () => {
-  if (animationFrameId) {
-    cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
-  }
-};
+// Note: Playback loop is now handled by individual components (Stage.tsx)
+// to avoid conflicts and ensure smooth video synchronization

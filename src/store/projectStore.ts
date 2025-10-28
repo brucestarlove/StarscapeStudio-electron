@@ -17,7 +17,7 @@ interface ProjectStore extends ProjectState {
   updateTrack: (trackId: string, updates: Partial<Track>) => void;
   
   // Clip actions
-  createClip: (assetId: string, trackId: string, startMs: number) => void;
+  createClip: (assetId: string, trackId: string, startMs: number) => string;
   updateClip: (clipId: string, updates: Partial<Clip>) => void;
   deleteClip: (clipId: string) => void;
   moveClip: (clipId: string, trackId: string, startMs: number) => void;
@@ -45,6 +45,7 @@ interface ProjectStore extends ProjectState {
 }
 
 const initialProjectState: ProjectState = {
+  id: generateId(),
   projectName: 'Untitled Project',
   assets: [],
   tracks: [
@@ -157,7 +158,7 @@ export const useProjectStore = create<ProjectStore>()(
               id: result.asset_id,
               type: assetType,
               name: result.file_path.split('/').pop() || 'Unknown',
-              url: `file://${result.file_path}`, // Use file:// protocol for local files
+              url: `media://${result.file_path}`, // Use custom media:// protocol for local files
               duration: result.metadata.duration_ms,
               metadata: {
                 width: result.metadata.width || 0,
@@ -247,13 +248,14 @@ export const useProjectStore = create<ProjectStore>()(
       
       // Clip actions
       createClip: (assetId: string, trackId: string, startMs: number) => {
+        let clipId = '';
         set((state) => {
           const asset = state.assets.find((a: Asset) => a.id === assetId);
           const track = state.tracks.find((t: Track) => t.id === trackId);
           
           if (!asset || !track) return;
           
-          const clipId = generateId();
+          clipId = generateId();
           const clip: Clip = {
             id: clipId,
             assetId,
@@ -281,6 +283,7 @@ export const useProjectStore = create<ProjectStore>()(
             opacity: 1,
           };
         });
+        return clipId;
       },
       
       updateClip: (clipId: string, updates: Partial<Clip>) => {
@@ -499,6 +502,7 @@ export const useProjectStore = create<ProjectStore>()(
     {
       name: 'starscape-project-storage',
       partialize: (state) => ({
+        id: state.id,
         projectName: state.projectName,
         assets: state.assets,
         tracks: state.tracks,
@@ -506,6 +510,15 @@ export const useProjectStore = create<ProjectStore>()(
         canvasNodes: state.canvasNodes,
         selectedClipIds: state.selectedClipIds,
       }),
+      // Merge function to handle backward compatibility (projects without id)
+      merge: (persistedState: any, currentState: any) => {
+        return {
+          ...currentState,
+          ...persistedState,
+          // Ensure we always have an ID
+          id: persistedState?.id || generateId(),
+        };
+      },
     }
   )
 );

@@ -1,52 +1,54 @@
-import { Card } from "@/components/ui/card";
 import { Ruler } from "./Ruler";
 import { Track } from "./Track";
 import { Playhead } from "./Playhead";
 import { TransportControls } from "../Transport/TransportControls";
+import { TrackHeader } from "./TrackHeader";
 import { useProjectStore } from "@/store/projectStore";
 
 export function TimelineDock() {
   const { tracks } = useProjectStore();
 
   return (
-    <div className="h-full bg-dark-navy border-t border-light-blue/20">
-      <Card variant="dark-glass" className="h-full">
-        <div className="h-full flex flex-col">
-          {/* Timeline header */}
-          <div className="flex items-center justify-between p-sm border-b border-white/10">
-            <h2 className="text-h3 font-semibold text-light-blue">Timeline</h2>
-            <div className="text-caption text-white/50">
-              {tracks.length} tracks
-            </div>
-          </div>
+    <div className="h-full bg-gradient-to-b from-dark-navy to-mid-navy border-t border-light-blue/30 shadow-lg flex flex-col">
+      {/* Fixed row for ruler and track headers */}
+      <div className="flex h-10 border-b border-white/20 bg-gradient-to-b from-mid-navy/80 to-dark-navy/80 flex-shrink-0">
+        {/* Spacer for track headers - matches track header width */}
+        <div className="w-56 border-r border-white/10 bg-gradient-to-r from-mid-navy/50 to-mid-navy/30" />
+        
+        {/* Ruler - fixed, doesn't scroll */}
+        <div className="flex-1 overflow-hidden">
+          <Ruler />
+        </div>
+      </div>
 
-          {/* Timeline content */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Ruler */}
-            <div className="h-8 border-b border-white/10">
-              <Ruler />
-            </div>
+      {/* Scrollable tracks area */}
+      <div className="flex-1 flex overflow-hidden bg-gradient-to-b from-dark-navy/50 to-mid-navy/30">
+        {/* Fixed track headers column */}
+        <div className="w-56 flex-shrink-0 overflow-y-auto scrollbar-starscape border-r border-white/10">
+          {tracks.map((track) => (
+            <TrackHeader key={`header-${track.id}`} trackId={track.id} />
+          ))}
+        </div>
 
-            {/* Tracks area */}
-            <div className="flex-1 relative overflow-auto scrollbar-starscape">
-              {/* Playhead */}
-              <Playhead />
-              
-              {/* Tracks */}
-              <div className="space-y-xs p-sm">
-                {tracks.map((track) => (
-                  <Track key={track.id} trackId={track.id} />
-                ))}
-              </div>
-            </div>
-
-            {/* Transport controls */}
-            <div className="border-t border-white/10">
-              <TransportControls />
-            </div>
+        {/* Scrollable track content area */}
+        <div className="flex-1 overflow-auto scrollbar-starscape relative" id="tracks-scroll">
+          {/* Wide container for timeline */}
+          <div className="relative min-w-[6000px]">
+            {/* Playhead - positioned absolutely in this container */}
+            <Playhead />
+            
+            {/* Track lanes */}
+            {tracks.map((track) => (
+              <Track key={track.id} trackId={track.id} />
+            ))}
           </div>
         </div>
-      </Card>
+      </div>
+
+      {/* Transport controls */}
+      <div className="border-t border-white/20 bg-gradient-to-r from-mid-navy/50 to-dark-navy/50 flex-shrink-0">
+        <TransportControls />
+      </div>
     </div>
   );
 }

@@ -34,7 +34,7 @@ export function Ruler() {
   const markers = generateMarkers();
 
   return (
-    <div className="h-full relative bg-mid-navy">
+    <div className="h-full relative bg-gradient-to-b from-mid-navy/90 to-dark-navy/90 min-w-[6000px]">
       {/* Time markers */}
       {markers.map((marker) => (
         <div
@@ -45,14 +45,16 @@ export function Ruler() {
           {/* Tick mark */}
           <div
             className={cn(
-              "w-px bg-white/50",
-              marker.isMajor ? "h-full" : "h-1/2"
+              "w-px",
+              marker.isMajor 
+                ? "h-full bg-light-blue/60 shadow-sm shadow-light-blue/20" 
+                : "h-1/2 bg-white/40"
             )}
           />
           
           {/* Time label */}
           {marker.isMajor && marker.label && (
-            <div className="absolute top-1 left-1 text-caption text-white/70 font-mono">
+            <div className="absolute top-1 left-1 text-caption text-light-blue/90 font-mono font-medium bg-dark-navy/80 px-xs py-xs rounded-sm shadow-sm">
               {marker.label}
             </div>
           )}
@@ -65,12 +67,15 @@ export function Ruler() {
           {markers.map((marker) => (
             <div
               key={`grid-${marker.time}`}
-              className="absolute top-0 w-px h-full bg-white/10"
+              className="absolute top-0 w-px h-full bg-white/5"
               style={{ left: `${marker.x}px` }}
             />
           ))}
         </div>
       )}
+
+      {/* Subtle gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
     </div>
   );
 }

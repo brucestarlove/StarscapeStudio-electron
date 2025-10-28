@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog, protocol } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const squirrelStartup = require('electron-squirrel-startup');
 
 const { configureFfmpeg } = require('./ffmpeg');
@@ -28,6 +29,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    title: 'Starscape ClipForge',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -44,7 +46,13 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   } else {
     // Load from built files
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    if (app.isPackaged) {
+      // In packaged app, use the path relative to ASAR root
+      mainWindow.loadFile('dist/index.html');
+    } else {
+      // In development, use relative path from main.js
+      mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    }
   }
 
   // Handle window closed event
@@ -161,9 +169,55 @@ async function initialize() {
   cacheDirs = new CacheDirs(app);
   await cacheDirs.ensureDirectories();
 
+  // Register custom protocol for serving local media files
+  protocol.registerFileProtocol('media', (request, callback) => {
+    try {
+      // Extract file path from media:// URL
+      let url = request.url.substring('media://'.length);
+      
+      // Add leading slash if missing (protocol strips it)
+      if (!url.startsWith('/')) {
+        url = '/' + url;
+      }
+      
+      // Decode URI component to handle spaces and special characters
+      const filePath = decodeURIComponent(url);
+      
+      console.log(`[media://] Request for: ${request.url}`);
+      console.log(`[media://] Decoded path: ${filePath}`);
+      
+      // Security check: ensure the file exists and is readable
+      if (!fs.existsSync(filePath)) {
+        console.error(`[media://] File not found: ${filePath}`);
+        callback({ error: -6 }); // NET::ERR_FILE_NOT_FOUND
+        return;
+      }
+      
+      console.log(`[media://] File exists, serving: ${filePath}`);
+      callback({ path: filePath });
+    } catch (error) {
+      console.error('[media://] Error serving media file:', error);
+      callback({ error: -2 }); // NET::ERR_FAILED
+    }
+  });
+
   // Create window
   createWindow();
 }
+
+// Register protocol scheme as privileged BEFORE app is ready
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'media',
+    privileges: {
+      bypassCSP: true,
+      stream: true,
+      supportFetchAPI: true,
+      standard: true,
+      secure: true
+    }
+  }
+]);
 
 // App lifecycle
 app.whenReady().then(initialize);
@@ -484,6 +538,47 @@ ipcMain.handle('ingest-files', async (event, request) => {
     return results;
   } catch (error) {
     throw new Error(`Failed to ingest files: ${error}`);
+  }
+});
+
+/**
+ * Apply edits to project (placeholder implementation)
+ */
+ipcMain.handle('apply-edits', async (event, projectJson) => {
+  try {
+    // For now, this is a placeholder - in a real implementation,
+    // this would process the project JSON and apply any pending edits
+    console.log('Apply edits called with project:', JSON.parse(projectJson));
+    return { success: true };
+  } catch (error) {
+    throw new Error(`Failed to apply edits: ${error.message}`);
+  }
+});
+
+/**
+ * Open file dialog to select media files
+ */
+ipcMain.handle('open-file-dialog', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Media Files', extensions: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'mp3', 'wav', 'aac', 'flac', 'ogg', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'] },
+        { name: 'Video Files', extensions: ['mp4', 'mov', 'avi', 'mkv', 'webm'] },
+        { name: 'Audio Files', extensions: ['mp3', 'wav', 'aac', 'flac', 'ogg'] },
+        { name: 'Image Files', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+      return { filePaths: result.filePaths };
+    }
+    
+    return { filePaths: [] };
+  } catch (error) {
+    console.error('Error opening file dialog:', error);
+    throw new Error(`Failed to open file dialog: ${error.message}`);
   }
 });
 
