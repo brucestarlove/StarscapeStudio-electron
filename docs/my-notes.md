@@ -15,5 +15,6 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 
 [ ] smooth seeking
 [ ] smooth clipping
+[x] export including clipped!
 [ ] fix export modal style
 [ ] 

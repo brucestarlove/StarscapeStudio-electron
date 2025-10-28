@@ -18,8 +18,8 @@ export function ClipView({ clip }: ClipViewProps) {
   const asset = getAssetById(clip.assetId);
   const isSelected = selectedClipIds.includes(clip.id);
   
-  // Trim state
-  const [trimming, setTrimming] = useState<{side: 'left'|'right', startX: number} | null>(null);
+  // Trim state - track both start position and last position to calculate incremental deltas
+  const [trimming, setTrimming] = useState<{side: 'left'|'right', startX: number, lastX: number} | null>(null);
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: clip.id,
@@ -55,7 +55,7 @@ export function ClipView({ clip }: ClipViewProps) {
   const handleTrimStart = (side: 'left'|'right', e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    setTrimming({ side, startX: e.clientX });
+    setTrimming({ side, startX: e.clientX, lastX: e.clientX });
   };
 
   // Global mouse handlers for trimming
@@ -63,9 +63,17 @@ export function ClipView({ clip }: ClipViewProps) {
     if (!trimming) return;
 
     const handleMove = (e: MouseEvent) => {
-      const deltaX = e.clientX - trimming.startX;
-      const deltaMs = deltaX / zoom; // Convert pixels to milliseconds
+      // Calculate incremental delta since last mouse move
+      const deltaX = e.clientX - trimming.lastX;
+      
+      // Convert pixels to milliseconds: zoom is in px/ms, so ms = px / (px/ms)
+      const deltaMs = deltaX / zoom;
+      
+      // Apply the trim
       trimClip(clip.id, trimming.side, deltaMs);
+      
+      // Update last position for next delta calculation
+      setTrimming(prev => prev ? { ...prev, lastX: e.clientX } : null);
     };
 
     const handleUp = () => {
