@@ -157,7 +157,7 @@ export const useProjectStore = create<ProjectStore>()(
               id: result.asset_id,
               type: assetType,
               name: result.file_path.split('/').pop() || 'Unknown',
-              url: `file://${result.file_path}`, // Use file:// protocol for local files
+              url: `media://${result.file_path}`, // Use custom media:// protocol for local files
               duration: result.metadata.duration_ms,
               metadata: {
                 width: result.metadata.width || 0,

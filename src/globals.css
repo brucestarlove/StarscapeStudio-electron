@@ -296,7 +296,6 @@
     font-size: var(--font-caption);
   }
   .timeline-clip:hover {
-    transform: scale(1.05);
     box-shadow: var(--shadow-subtle);
   }
 

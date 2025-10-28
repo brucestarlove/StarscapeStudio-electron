@@ -7,24 +7,11 @@ import { Stage } from "@/components/Stage/Stage";
 import { TimelineDock } from "@/components/Timeline/TimelineDock";
 import { DebugPanel } from "@/components/DebugPanel";
 import { useProjectStore } from "@/store/projectStore";
-import { usePlaybackStore, startPlaybackLoop, stopPlaybackLoop } from "@/store/playbackStore";
 import type { DragItem } from "@/types";
 import "./globals.css";
 
 function App() {
   const { createClip, moveClip, trimClip } = useProjectStore();
-  const { playing } = usePlaybackStore();
-
-  // Start/stop playback loop
-  useEffect(() => {
-    if (playing) {
-      startPlaybackLoop();
-    } else {
-      stopPlaybackLoop();
-    }
-    
-    return () => stopPlaybackLoop();
-  }, [playing]);
 
   // Prevent default browser behavior on file drag/drop (avoids navigation)
   useEffect(() => {
@@ -80,7 +67,7 @@ function App() {
         onDragEnd={handleDragEnd}
       >
         {/* Three-row, three-column grid layout */}
-        <div className="h-full grid grid-rows-[60px_1fr_200px] grid-cols-[60px_300px_1fr]">
+        <div className="h-full grid grid-rows-[60px_1fr_320px] grid-cols-[60px_300px_1fr]">
           {/* TopBar spans full width */}
           <div className="col-span-3 row-start-1">
             <TopBar />

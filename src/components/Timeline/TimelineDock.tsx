@@ -15,7 +15,7 @@ export function TimelineDock() {
           {/* Timeline header */}
           <div className="flex items-center justify-between p-md border-b border-white/20 bg-gradient-to-r from-mid-navy/50 to-dark-navy/50">
             <h2 className="text-h3 font-semibold text-light-blue flex items-center">
-              <div className="w-2 h-2 bg-light-blue rounded-full mr-sm animate-pulse"></div>
+              <div className="w-2 h-2 bg-light-blue rounded-full mr-sm"></div>
               Timeline
             </h2>
             <div className="text-caption text-white/70 bg-white/5 px-sm py-xs rounded-md">
@@ -25,9 +25,17 @@ export function TimelineDock() {
 
           {/* Timeline content */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Ruler */}
-            <div className="h-10 border-b border-white/20 bg-gradient-to-b from-mid-navy/80 to-dark-navy/80">
-              <Ruler />
+            {/* Ruler with track header spacer */}
+            <div className="flex h-12 border-b border-white/20 bg-gradient-to-b from-mid-navy/80 to-dark-navy/80">
+              {/* Spacer for track headers */}
+              <div className="w-56 border-r border-white/10 flex items-center justify-center">
+                <span className="text-caption text-white/50 font-semibold uppercase tracking-wide">Tracks</span>
+              </div>
+              
+              {/* Ruler */}
+              <div className="flex-1">
+                <Ruler />
+              </div>
             </div>
 
             {/* Tracks area */}
@@ -36,7 +44,7 @@ export function TimelineDock() {
               <Playhead />
               
               {/* Tracks */}
-              <div className="space-y-xs p-md">
+              <div className="space-y-0">
                 {tracks.map((track) => (
                   <Track key={track.id} trackId={track.id} />
                 ))}

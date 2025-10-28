@@ -85,11 +85,10 @@ export function ClipView({ clip }: ClipViewProps) {
     <div
       ref={setNodeRef}
       className={cn(
-        "absolute top-2 bottom-2 timeline-clip cursor-pointer transition-all duration-200 rounded-sm shadow-lg group",
+        "absolute top-2 bottom-2 timeline-clip cursor-pointer rounded-sm shadow-lg",
         "bg-gradient-to-r from-light-blue/20 to-cyan-500/20 border border-light-blue/30",
-        "hover:shadow-xl hover:shadow-light-blue/20 hover:scale-[1.02]",
         isSelected && "ring-2 ring-light-blue ring-opacity-60 shadow-xl shadow-light-blue/30",
-        isDragging && "opacity-50 scale-95"
+        isDragging && "opacity-50"
       )}
       style={{
         left: `${clipLeft}px`,
@@ -120,10 +119,9 @@ export function ClipView({ clip }: ClipViewProps) {
           {/* Left trim handle */}
           <div
             className={cn(
-              "absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-l-sm transition-all duration-200",
-              "bg-gradient-to-r from-light-blue/60 to-light-blue/40 hover:from-light-blue to-light-blue/80",
-              "hover:shadow-lg hover:shadow-light-blue/30",
-              isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              "absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-l-sm",
+              "bg-gradient-to-r from-light-blue/60 to-light-blue/40",
+              isSelected ? "opacity-100" : "opacity-0"
             )}
             onMouseDown={(e) => handleTrimStart('left', e)}
           />
@@ -131,10 +129,9 @@ export function ClipView({ clip }: ClipViewProps) {
           {/* Right trim handle */}
           <div
             className={cn(
-              "absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-r-sm transition-all duration-200",
-              "bg-gradient-to-l from-light-blue/60 to-light-blue/40 hover:from-light-blue to-light-blue/80",
-              "hover:shadow-lg hover:shadow-light-blue/30",
-              isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              "absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-r-sm",
+              "bg-gradient-to-l from-light-blue/60 to-light-blue/40",
+              isSelected ? "opacity-100" : "opacity-0"
             )}
             onMouseDown={(e) => handleTrimStart('right', e)}
           />

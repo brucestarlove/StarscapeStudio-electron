@@ -45,7 +45,7 @@ export function Ruler() {
           {/* Tick mark */}
           <div
             className={cn(
-              "w-px transition-colors duration-200",
+              "w-px",
               marker.isMajor 
                 ? "h-full bg-light-blue/60 shadow-sm shadow-light-blue/20" 
                 : "h-1/2 bg-white/40"

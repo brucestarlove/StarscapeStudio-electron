@@ -44,22 +44,23 @@ export function Stage() {
   }, [visibleAsset, sourceTimeMs, playing]);
 
   return (
-    <div className="h-full bg-dark-navy p-lg">
-      <Card variant="dark-glass" className="h-full">
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-md border-b border-white/10">
-            <h2 className="text-h3 font-semibold text-light-blue">Preview</h2>
-            <div className="text-caption text-white/50">
-              {formatTimecode(currentTimeMs)}
-            </div>
+    <div className="h-full bg-dark-navy p-md">
+      <div className="h-full flex flex-col">
+        {/* Compact header */}
+        <div className="flex items-center justify-between px-lg py-sm border-b border-white/10">
+          <h2 className="text-body font-medium text-white/70">Preview</h2>
+          <div className="text-caption text-white/40 font-mono">
+            {formatTimecode(currentTimeMs)}
           </div>
+        </div>
 
-          {/* Canvas area */}
-          <div className="flex-1 relative bg-mid-navy rounded-md overflow-hidden">
-            {/* 16:9 aspect ratio container */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative w-full max-w-4xl aspect-video bg-black rounded-md overflow-hidden">
+        {/* Canvas area - fills remaining space */}
+        <div className="flex-1 relative bg-black/20 overflow-hidden">
+          {/* 16:9 aspect ratio container - maximized to fit available space */}
+          <div className="absolute inset-0 flex items-center justify-center p-md">
+            <div className="relative w-full h-full max-h-full flex items-center justify-center">
+              {/* Actual video container maintains aspect ratio */}
+              <div className="relative aspect-video bg-black w-full h-full max-w-full max-h-full object-contain">
                 {/* Video playback */}
                 {visibleAsset && visibleAsset.type === 'video' ? (
                   <video
@@ -129,7 +130,7 @@ export function Stage() {
             </div>
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

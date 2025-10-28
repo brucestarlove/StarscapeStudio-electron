@@ -39,7 +39,7 @@ function AssetCard({ asset, onDoubleClick }: AssetCardProps) {
       ref={setNodeRef}
       variant="dark-glass"
       className={cn(
-        "cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-elevated",
+        "cursor-pointer transition-all duration-200 hover:shadow-elevated",
         isDragging && "opacity-50"
       )}
       onDoubleClick={onDoubleClick}

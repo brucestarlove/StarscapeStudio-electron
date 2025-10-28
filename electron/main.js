@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog, protocol } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const squirrelStartup = require('electron-squirrel-startup');
 
 const { configureFfmpeg } = require('./ffmpeg');
@@ -168,9 +169,55 @@ async function initialize() {
   cacheDirs = new CacheDirs(app);
   await cacheDirs.ensureDirectories();
 
+  // Register custom protocol for serving local media files
+  protocol.registerFileProtocol('media', (request, callback) => {
+    try {
+      // Extract file path from media:// URL
+      let url = request.url.substring('media://'.length);
+      
+      // Add leading slash if missing (protocol strips it)
+      if (!url.startsWith('/')) {
+        url = '/' + url;
+      }
+      
+      // Decode URI component to handle spaces and special characters
+      const filePath = decodeURIComponent(url);
+      
+      console.log(`[media://] Request for: ${request.url}`);
+      console.log(`[media://] Decoded path: ${filePath}`);
+      
+      // Security check: ensure the file exists and is readable
+      if (!fs.existsSync(filePath)) {
+        console.error(`[media://] File not found: ${filePath}`);
+        callback({ error: -6 }); // NET::ERR_FILE_NOT_FOUND
+        return;
+      }
+      
+      console.log(`[media://] File exists, serving: ${filePath}`);
+      callback({ path: filePath });
+    } catch (error) {
+      console.error('[media://] Error serving media file:', error);
+      callback({ error: -2 }); // NET::ERR_FAILED
+    }
+  });
+
   // Create window
   createWindow();
 }
+
+// Register protocol scheme as privileged BEFORE app is ready
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'media',
+    privileges: {
+      bypassCSP: true,
+      stream: true,
+      supportFetchAPI: true,
+      standard: true,
+      secure: true
+    }
+  }
+]);
 
 // App lifecycle
 app.whenReady().then(initialize);
