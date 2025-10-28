@@ -7,8 +7,10 @@ import type { Clip } from "@/types";
 
 export function Stage() {
   const { canvasNodes, clips, getAssetById, tracks } = useProjectStore();
-  const { currentTimeMs, playing } = usePlaybackStore();
+  const { currentTimeMs, playing, seek } = usePlaybackStore();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const isSeekingRef = useRef(false); // Track if we're programmatically seeking
+  const loadedAssetIdRef = useRef<string | null>(null); // Track which asset is loaded
 
   // Find the visible clip at current time
   const visibleClip = getVisibleClip(clips, tracks, currentTimeMs);
@@ -19,29 +21,89 @@ export function Stage() {
     ? (currentTimeMs - visibleClip.startMs) + visibleClip.trimStartMs
     : 0;
 
+  // Load video source when asset changes
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !visibleAsset) return;
+
+    // Only update source if the asset actually changed
+    if (loadedAssetIdRef.current !== visibleAsset.id) {
+      console.log('Loading new video source:', visibleAsset.url);
+      video.src = visibleAsset.url;
+      video.load();
+      loadedAssetIdRef.current = visibleAsset.id;
+    }
+  }, [visibleAsset]);
+
   // Sync video playback with store
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !visibleAsset) return;
 
-    // Update video source if asset changed
-    if (video.src !== visibleAsset.url) {
-      video.src = visibleAsset.url;
-    }
+    console.log('Playback sync effect:', {
+      playing,
+      currentTimeMs,
+      sourceTimeMs,
+      videoTime: video.currentTime,
+      videoPaused: video.paused
+    });
 
-    // Seek to correct time
+    // Only seek if there's a significant difference (user seeked)
     const targetTime = sourceTimeMs / 1000; // Convert to seconds
-    if (Math.abs(video.currentTime - targetTime) > 0.1) {
+    const timeDiff = Math.abs(video.currentTime - targetTime);
+    
+    console.log('Time comparison:', { targetTime, videoTime: video.currentTime, timeDiff });
+    
+    // If the difference is more than 0.5 seconds, user likely seeked manually
+    if (timeDiff > 0.5) {
+      console.log('Seeking video to:', targetTime);
+      isSeekingRef.current = true;
       video.currentTime = targetTime;
+      // Reset flag after a short delay
+      setTimeout(() => {
+        isSeekingRef.current = false;
+      }, 100);
     }
 
     // Sync play/pause state
     if (playing && video.paused) {
-      video.play().catch(console.error);
+      console.log('Starting video playback');
+      video.play().catch(err => {
+        console.error('Play error:', err);
+      });
     } else if (!playing && !video.paused) {
+      console.log('Pausing video');
       video.pause();
     }
   }, [visibleAsset, sourceTimeMs, playing]);
+
+  // Update playback store as video plays
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !visibleClip) return;
+
+    const handleTimeUpdate = () => {
+      // Don't update store if we're programmatically seeking
+      if (isSeekingRef.current || !playing) {
+        console.log('Skipping timeupdate:', { isSeekingRef: isSeekingRef.current, playing });
+        return;
+      }
+      
+      // Calculate timeline time from video time
+      const videoTimeMs = video.currentTime * 1000;
+      const timelineTimeMs = (videoTimeMs - visibleClip.trimStartMs) + visibleClip.startMs;
+      
+      console.log('Timeupdate:', { videoTimeMs, timelineTimeMs, trimStart: visibleClip.trimStartMs, clipStart: visibleClip.startMs });
+      
+      // Update store with the current playback position
+      seek(timelineTimeMs);
+    };
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [visibleClip, playing, seek]);
 
   return (
     <div className="h-full bg-dark-navy p-md">
