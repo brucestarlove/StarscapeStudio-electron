@@ -7,6 +7,9 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
 
+  // Use relative paths for Electron packaging
+  base: './',
+
   // Path aliases
   resolve: {
     alias: {

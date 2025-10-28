@@ -4,6 +4,7 @@ import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { msToPixels, formatTimecode } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 import type { Clip } from "@/types";
 
 interface ClipViewProps {
@@ -11,11 +12,14 @@ interface ClipViewProps {
 }
 
 export function ClipView({ clip }: ClipViewProps) {
-  const { selectedClipIds, selectClip, getAssetById } = useProjectStore();
+  const { selectedClipIds, selectClip, getAssetById, trimClip } = useProjectStore();
   const { zoom } = usePlaybackStore();
   
   const asset = getAssetById(clip.assetId);
   const isSelected = selectedClipIds.includes(clip.id);
+  
+  // Trim state
+  const [trimming, setTrimming] = useState<{side: 'left'|'right', startX: number} | null>(null);
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: clip.id,
@@ -46,6 +50,36 @@ export function ClipView({ clip }: ClipViewProps) {
     e.stopPropagation();
     selectClip(clip.id);
   };
+
+  // Trim handle mouse events
+  const handleTrimStart = (side: 'left'|'right', e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setTrimming({ side, startX: e.clientX });
+  };
+
+  // Global mouse handlers for trimming
+  useEffect(() => {
+    if (!trimming) return;
+
+    const handleMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - trimming.startX;
+      const deltaMs = deltaX / zoom; // Convert pixels to milliseconds
+      trimClip(clip.id, trimming.side, deltaMs);
+    };
+
+    const handleUp = () => {
+      setTrimming(null);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [trimming, clip.id, zoom, trimClip]);
 
   return (
     <div
@@ -85,12 +119,14 @@ export function ClipView({ clip }: ClipViewProps) {
           <div
             className="absolute left-0 top-0 bottom-0 w-2 bg-light-blue/50 hover:bg-light-blue cursor-ew-resize"
             style={{ opacity: isSelected ? 1 : 0 }}
+            onMouseDown={(e) => handleTrimStart('left', e)}
           />
           
           {/* Right trim handle */}
           <div
             className="absolute right-0 top-0 bottom-0 w-2 bg-light-blue/50 hover:bg-light-blue cursor-ew-resize"
             style={{ opacity: isSelected ? 1 : 0 }}
+            onMouseDown={(e) => handleTrimStart('right', e)}
           />
         </>
       )}

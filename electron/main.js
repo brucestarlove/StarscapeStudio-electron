@@ -28,6 +28,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    title: 'Starscape ClipForge',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -44,7 +45,13 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   } else {
     // Load from built files
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    if (app.isPackaged) {
+      // In packaged app, use the path relative to ASAR root
+      mainWindow.loadFile('dist/index.html');
+    } else {
+      // In development, use relative path from main.js
+      mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    }
   }
 
   // Handle window closed event
