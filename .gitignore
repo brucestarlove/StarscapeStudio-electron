@@ -22,5 +22,8 @@ dist-ssr
 *.sln
 *.sw?
 
-target/
+# Electron build output
+build/
+out/
+
 package-lock.json

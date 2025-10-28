@@ -1,3 +1,0 @@
-#!/bin/bash
-# Wrapper to use system FFmpeg
-exec /opt/homebrew/bin/ffmpeg "$@"

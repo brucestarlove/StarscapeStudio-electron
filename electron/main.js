@@ -36,7 +36,7 @@ function createWindow() {
 
   if (isDev) {
     // Load from Vite dev server
-    mainWindow.loadURL('http://localhost:1420');
+    mainWindow.loadURL('http://localhost:3000');
     mainWindow.webContents.openDevTools();
   } else {
     // Load from built files

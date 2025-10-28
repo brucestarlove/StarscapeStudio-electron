@@ -1,3 +1,0 @@
-#!/bin/bash
-# Wrapper to use system FFprobe
-exec /opt/homebrew/bin/ffprobe "$@"

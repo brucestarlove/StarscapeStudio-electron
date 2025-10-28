@@ -21,7 +21,7 @@
   "mac": {
     "category": "public.app-category.video",
     "target": ["dmg"],
-    "icon": "src-tauri/icons/icon.icns"
+    "icon": "build-resources/icons/icon.icns"
   }
 }
 

@@ -17,10 +17,10 @@ export default defineConfig(async () => ({
   // Standard Vite configuration
   clearScreen: false,
   server: {
-    port: 1420,  // Keep same port for consistency with Tauri version
+    port: 3000,  // Standard React dev server port
     strictPort: true,
     hmr: {
-      port: 1421,
+      port: 3001,
     },
   },
   
