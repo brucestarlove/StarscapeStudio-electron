@@ -35,35 +35,10 @@ export function Stage() {
     }
   }, [visibleAsset]);
 
-  // Sync video playback with store
+  // Sync video playback with store - only for play/pause and manual seeks
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !visibleAsset) return;
-
-    console.log('Playback sync effect:', {
-      playing,
-      currentTimeMs,
-      sourceTimeMs,
-      videoTime: video.currentTime,
-      videoPaused: video.paused
-    });
-
-    // Only seek if there's a significant difference (user seeked)
-    const targetTime = sourceTimeMs / 1000; // Convert to seconds
-    const timeDiff = Math.abs(video.currentTime - targetTime);
-    
-    console.log('Time comparison:', { targetTime, videoTime: video.currentTime, timeDiff });
-    
-    // If the difference is more than 0.5 seconds, user likely seeked manually
-    if (timeDiff > 0.5) {
-      console.log('Seeking video to:', targetTime);
-      isSeekingRef.current = true;
-      video.currentTime = targetTime;
-      // Reset flag after a short delay
-      setTimeout(() => {
-        isSeekingRef.current = false;
-      }, 100);
-    }
 
     // Sync play/pause state
     if (playing && video.paused) {
@@ -75,7 +50,28 @@ export function Stage() {
       console.log('Pausing video');
       video.pause();
     }
-  }, [visibleAsset, sourceTimeMs, playing]);
+  }, [visibleAsset, playing]);
+
+  // Handle manual seeking (when currentTimeMs changes significantly)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !visibleClip || isSeekingRef.current) return;
+
+    const targetTime = sourceTimeMs / 1000; // Convert to seconds
+    const timeDiff = Math.abs(video.currentTime - targetTime);
+    
+    // Only seek if there's a significant difference (user manually seeked)
+    // Use a larger threshold to avoid triggering during normal playback
+    if (timeDiff > 0.5) {
+      console.log('Manual seek detected, seeking video to:', targetTime);
+      isSeekingRef.current = true;
+      video.currentTime = targetTime;
+      // Reset flag after a short delay
+      setTimeout(() => {
+        isSeekingRef.current = false;
+      }, 100);
+    }
+  }, [sourceTimeMs, visibleClip]);
 
   // Update playback store as video plays
   useEffect(() => {

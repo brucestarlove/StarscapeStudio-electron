@@ -12,7 +12,7 @@ interface ExportDialogProps {
 }
 
 export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
-  const { projectName, assets, tracks, clips, canvasNodes } = useProjectStore();
+  const { id, projectName, assets, tracks, clips } = useProjectStore();
   
   // Export settings state
   const [settings, setSettings] = useState<ExportSettings>({
@@ -36,13 +36,59 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
       setProgress(null);
       setExportResult(null);
 
-      // Create project JSON
+      // Transform project state to backend format
+      // Backend expects: { id, assets: {}, clips: {}, tracks: {} }
+      // where tracks have clipOrder and role fields
+      const backendAssets: Record<string, any> = {};
+      assets.forEach(asset => {
+        // Convert media:// URL to file path
+        let srcPath = asset.url;
+        if (srcPath.startsWith('media://')) {
+          srcPath = srcPath.replace('media://', '');
+        }
+        
+        backendAssets[asset.id] = {
+          id: asset.id,
+          src: srcPath,
+          duration_ms: asset.duration,
+          width: asset.metadata.width,
+          height: asset.metadata.height,
+        };
+      });
+      
+      const backendClips: Record<string, any> = {};
+      Object.values(clips).forEach(clip => {
+        backendClips[clip.id] = {
+          id: clip.id,
+          assetId: clip.assetId,
+          inMs: clip.trimStartMs,    // Trim start in source
+          outMs: clip.trimEndMs,      // Trim end in source
+          startMs: clip.startMs,      // Position on timeline
+          endMs: clip.endMs,          // Position on timeline
+        };
+      });
+      
+      const backendTracks: Record<string, any> = {};
+      tracks.forEach((track, index) => {
+        // For MVP, first video track is 'main', others are overlays
+        const role = index === 0 && track.type === 'video' ? 'main' : 'overlay';
+        
+        backendTracks[track.id] = {
+          id: track.id,
+          name: track.name,
+          type: track.type,
+          role: role,
+          clipOrder: track.clips,
+        };
+      });
+
+      // Create project JSON in backend format
       const projectJson = JSON.stringify({
+        id,
         projectName,
-        assets,
-        tracks,
-        clips,
-        canvasNodes,
+        assets: backendAssets,
+        clips: backendClips,
+        tracks: backendTracks,
       });
 
       // Set up progress listener

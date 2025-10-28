@@ -46,6 +46,7 @@ export interface CanvasNode {
 }
 
 export interface ProjectState {
+  id: string;               // Unique project identifier
   projectName: string;
   assets: Asset[];
   tracks: Track[];

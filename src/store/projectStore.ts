@@ -45,6 +45,7 @@ interface ProjectStore extends ProjectState {
 }
 
 const initialProjectState: ProjectState = {
+  id: generateId(),
   projectName: 'Untitled Project',
   assets: [],
   tracks: [
@@ -501,6 +502,7 @@ export const useProjectStore = create<ProjectStore>()(
     {
       name: 'starscape-project-storage',
       partialize: (state) => ({
+        id: state.id,
         projectName: state.projectName,
         assets: state.assets,
         tracks: state.tracks,
@@ -508,6 +510,15 @@ export const useProjectStore = create<ProjectStore>()(
         canvasNodes: state.canvasNodes,
         selectedClipIds: state.selectedClipIds,
       }),
+      // Merge function to handle backward compatibility (projects without id)
+      merge: (persistedState: any, currentState: any) => {
+        return {
+          ...currentState,
+          ...persistedState,
+          // Ensure we always have an ID
+          id: persistedState?.id || generateId(),
+        };
+      },
     }
   )
 );
