@@ -1,0 +1,132 @@
+# Frontend Setup Log — ClipForge / Starscape Editor (2025-10-28)
+
+This log captures the Tailwind v4 migration, Starscape theme wiring, shadcn integration, Zustand state setup, utilities restoration, and build fixes completed today.
+
+## Tailwind CSS v4 Migration
+- Switched to CSS-first config per MCP:
+  - Replaced `@tailwind` blocks with `@import "tailwindcss"` at the top of `src/globals.css`.
+  - Added `@theme` token definitions in `src/globals.css` for Starscape colors, gradients, spacing, typography, shadows, radii, and z-index.
+  - Removed `tailwind.config.js` (v4 no longer uses it here).
+- PostCSS:
+  - `postcss.config.js` uses ESM and `@tailwindcss/postcss`:
+    ```js
+    export default { plugins: { '@tailwindcss/postcss': {}, autoprefixer: {} } }
+    ```
+- Vite:
+  - Installed and configured `@tailwindcss/vite` plugin (added to `vite.config.ts`).
+
+## Starscape Theme Integration
+- Centralized design tokens via `@theme` in `src/globals.css`:
+  - Colors: `--color-dark-navy`, `--color-mid-navy`, `--color-deep-blue`, `--color-light-blue`, semantic tokens (success, warning, error, info, purple).
+  - Gradients: `--gradient-cosmic`, `--gradient-cosmic-hover`, `--gradient-cyan-purple`, `--gradient-purple-blue`, `--gradient-pink-purple`, `--gradient-cyan-vibrant`.
+  - Spacing, typography, shadows, border radii, and z-index scale.
+- Replaced prior Tailwind-extend class names with direct CSS using theme tokens (v4-safe) for:
+  - Buttons: `.btn-primary`, `.btn-secondary`, `.btn-gradient`, `.btn-icon`.
+  - Cards: `.card-glass`, `.card-dark-glass`, `.card-gradient`.
+  - Inputs: `.input-starscape`.
+  - Modals: `.modal-backdrop`, `.modal-content`.
+  - Timeline UI: `.timeline-track`, `.timeline-clip`, state variants.
+  - Progress and tooltips.
+- Utility overrides under `@layer utilities`:
+  - Focus ring: `.focus-starscape:focus-visible`.
+  - Scrollbar styles.
+  - Gradient text helpers: `.text-gradient-starscape`, `.text-gradient-cyan`.
+
+## Shadcn/UI Usage
+- Custom shadcn components aligned to Starscape styles:
+  - `src/components/ui/button.tsx` — added Starscape variants (cosmic gradient, destructive, outline, secondary, ghost, link, gradient).
+  - `src/components/ui/card.tsx` — glass/dark-glass/gradient variants with updated sections.
+  - `src/components/ui/input.tsx` — Starscape focus/bg/border behavior.
+
+## Zustand State and Types
+- Types in `src/types/index.ts` for `Asset`, `Clip`, `Track`, `CanvasNode`, `ProjectState`, `PlaybackState`, `DragItem`.
+- Project store `src/store/projectStore.ts`:
+  - Actions: asset/track/clip CRUD, move/trim/split, selection helpers, getters.
+  - Fixed implicit `any` by fully typing actions and returns.
+- Playback store `src/store/playbackStore.ts`:
+  - State: `currentTimeMs`, `playing`, `zoom`, `snapEnabled`.
+  - Actions: play/pause/toggle, seek/step, zoom/snap toggles; playback loop helpers.
+- Installed `immer` to satisfy zustand middleware peer:
+  - `npm i immer` (fixes Rollup error for `produce` not exported).
+
+## Utilities Restoration
+- `src/lib/utils.ts` rehydrated after overwrite by shadcn init:
+  - Tailwind class merge `cn`, id generation, file type detection, timeline helpers (`msToPixels`, `pixelsToMs`, `formatTimecode`, snapping), validation helpers.
+
+## App Shell and Layout
+- `src/App.tsx` grid layout (TopBar / LeftRail / LeftPane / Stage / TimelineDock) with `@dnd-kit/core` context and drag handlers.
+- Components created/stubbed:
+  - TopBar, LeftRail, LeftPane (+ UploadModal, LibraryGrid), Stage, TimelineDock (+ Ruler, Track, ClipView, Playhead), TransportControls.
+
+## Build Issues Encountered & Fixes
+1) PostCSS ESM and plugin change
+   - Errors: module not defined; tailwindcss plugin moved.
+   - Actions: switch to ESM config, use `@tailwindcss/postcss`.
+2) Unknown Tailwind utilities (v4)
+   - Errors: `text-white`, `bg-gradient-cosmic`, `border-border`, `border-blue-light/20`.
+   - Actions: replaced `@apply` custom utilities with explicit CSS using tokens; removed legacy utility references; ensured base layer uses `hsl(var(--...))` for bg/text/border.
+3) Vite plugin missing
+   - Error: `@tailwindcss/vite` not found.
+   - Action: `npm i @tailwindcss/vite` and configure plugin.
+4) Zustand immer middleware
+   - Error: `"produce" is not exported by immer`.
+   - Action: `npm i immer`.
+5) TypeScript unused imports / implicit any
+   - Action: removed unused imports and fully typed store/action signatures.
+
+## Current Status
+- `npm run build` completes successfully.
+- Tailwind v4 is active with CSS-first setup and Starscape theme tokens.
+- All custom Starscape UI utilities are implemented in `globals.css` without relying on unsupported v4 `@apply` patterns.
+
+## Next Steps (Short)
+- Wire file import (drag & drop + file picker) and asset ingestion.
+- Hook timeline drag/trim to state + basic snap heuristics.
+- Integrate preview player and rudimentary export pathway stub to Tauri backend.
+- Add `.starproj` serialization/persist for state.
+
+---
+Generated by assistant after verifying MCP-aligned Tailwind v4 configuration and a successful production build.
+
+
+
+
+
+
+
+
+Here’s the shortest high-signal next-steps plan aligned with frontend-001-setup.md and 001-PRD-TauriReact.md.
+
+Frontend (now)
+- Assets ingestion wiring
+  - Replace `addAssets(Array.from(files))` to call a Tauri bridge: `invoke('ingest_assets', { files: [...paths] })`, then normalize into `Asset` entries in `projectStore`.
+  - Show ingest progress state in `UploadModal`.
+- Timeline basics
+  - Make trim handles accurate: compute `trimStartMs/trimEndMs` against asset duration, enforce `validateClipTrim`, snap to grid/adjacent clips.
+  - Implement clip reordering within a track via `dnd-kit` and update `moveClip` logic for overlap prevention.
+- Playback/preview
+  - Stage: simple `<video>` bound to a preview URL; on `currentTimeMs` change, `video.currentTime` updates; play/pause sync.
+  - Transport: keyboard shortcuts (space, J/K/L, +/- zoom).
+- Export
+  - Add an `ExportModal` (format, resolution, bitrate), call `invoke('export_project', { project })`, show progress.
+
+Backend (you implement in Rust/Tauri; I won’t touch it)
+- ingest_assets(files[])
+  - Copy to app cache/media dir; return array of { id, name, path, type, duration, width?, height?, thumbnailPath? }.
+- get_media_metadata(path)
+  - ffprobe: duration (ms), streams, dimensions, type.
+- generate_thumbnail(path, at_ms)
+  - Save to cache; return `thumbnailPath`.
+- generate_preview(edit_plan or project)
+  - Produce a low-res preview file; return `{ preview_url }`. Async-friendly.
+- export_project(project, options)
+  - Render final `.mp4`/`.mov` with options; progress events recommended.
+
+Optional persistence
+- Save/load `.starproj` with `assets`, `tracks`, `clips`, `canvasNodes`, `historyPointer`.
+
+Quick win polish
+- Left Pane: already expands on upload/Library tab (done).
+- Add empty-state CTA in Stage to prompt adding first asset.
+
+Want me to proceed with the frontend “Assets ingestion wiring” and stub the Tauri bridge in `src/lib/bindings.ts` while you implement the Rust commands? If yes, I’ll ask to create a new log file name, e.g., docs/logs/frontend-002-assets-ingestion.md.

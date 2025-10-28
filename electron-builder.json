@@ -1,0 +1,27 @@
+{
+  "appId": "com.starscape.clipforge",
+  "productName": "Starscape ClipForge",
+  "directories": {
+    "output": "build",
+    "buildResources": "build-resources"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json",
+    "!electron/bin/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "electron/bin/macos",
+      "to": "bin/macos",
+      "filter": ["ffmpeg", "ffprobe"]
+    }
+  ],
+  "mac": {
+    "category": "public.app-category.video",
+    "target": ["dmg"],
+    "icon": "src-tauri/icons/icon.icns"
+  }
+}
+
