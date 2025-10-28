@@ -5,7 +5,7 @@ const path = require('path');
 /**
  * Execute export job with progress tracking
  */
-async function executeExportJob(plan, settings, cache, mainWindow) {
+async function executeExportJob(plan, settings, cache, mainWindow, trackProcessFn) {
   const total = plan.mainTrack.length + 2; // segments + concat + finalize
   let current = 0;
 
@@ -31,12 +31,12 @@ async function executeExportJob(plan, settings, cache, mainWindow) {
 
     // Try codec copy first
     try {
-      await trimSegment(clip.srcPath, segPath, startSec, durationSec, true);
+      await trimSegment(clip.srcPath, segPath, startSec, durationSec, true, trackProcessFn);
       segmentPaths.push(segPath);
     } catch (err) {
       // Fallback to transcode
       console.log(`Codec copy failed for segment ${idx}, transcoding...`);
-      await trimSegment(clip.srcPath, segPath, startSec, durationSec, false);
+      await trimSegment(clip.srcPath, segPath, startSec, durationSec, false, trackProcessFn);
       segmentPaths.push(segPath);
     }
 
@@ -75,11 +75,11 @@ async function executeExportJob(plan, settings, cache, mainWindow) {
 
   // Try concat with codec copy
   try {
-    await concatenateSegments(concatPath, outPath, true);
+    await concatenateSegments(concatPath, outPath, true, trackProcessFn);
   } catch (err) {
     // Fallback to re-encode
     console.log('Concat with copy failed, re-encoding...');
-    await concatenateSegments(concatPath, outPath, false);
+    await concatenateSegments(concatPath, outPath, false, trackProcessFn);
   }
 
   current++;
@@ -101,7 +101,7 @@ async function executeExportJob(plan, settings, cache, mainWindow) {
 /**
  * Trim a single segment
  */
-function trimSegment(inputPath, outputPath, startSec, durationSec, copyCodec) {
+function trimSegment(inputPath, outputPath, startSec, durationSec, copyCodec, trackProcessFn) {
   return new Promise((resolve, reject) => {
     const command = ffmpeg(inputPath).seekInput(startSec).duration(durationSec);
 
@@ -118,18 +118,27 @@ function trimSegment(inputPath, outputPath, startSec, durationSec, copyCodec) {
         ]);
     }
 
-    command
+    const ffmpegProcess = command
       .output(outputPath)
-      .on('end', resolve)
-      .on('error', reject)
+      .on('end', () => {
+        if (trackProcessFn) trackProcessFn(ffmpegProcess);
+        resolve();
+      })
+      .on('error', (err) => {
+        if (trackProcessFn) trackProcessFn(ffmpegProcess);
+        reject(err);
+      })
       .run();
+      
+    // Track the process for cleanup
+    if (trackProcessFn) trackProcessFn(ffmpegProcess);
   });
 }
 
 /**
  * Concatenate segments
  */
-function concatenateSegments(concatListPath, outputPath, copyCodec) {
+function concatenateSegments(concatListPath, outputPath, copyCodec, trackProcessFn) {
   return new Promise((resolve, reject) => {
     const command = ffmpeg()
       .input(concatListPath)
@@ -148,11 +157,20 @@ function concatenateSegments(concatListPath, outputPath, copyCodec) {
         ]);
     }
 
-    command
+    const ffmpegProcess = command
       .output(outputPath)
-      .on('end', resolve)
-      .on('error', reject)
+      .on('end', () => {
+        if (trackProcessFn) trackProcessFn(ffmpegProcess);
+        resolve();
+      })
+      .on('error', (err) => {
+        if (trackProcessFn) trackProcessFn(ffmpegProcess);
+        reject(err);
+      })
       .run();
+      
+    // Track the process for cleanup
+    if (trackProcessFn) trackProcessFn(ffmpegProcess);
   });
 }
 

@@ -63,7 +63,7 @@ export async function getMediaMetadata(path: string): Promise<MediaMeta> {
   return window.electronAPI.getMediaMetadata(path);
 }
 
-export async function applyEdits(projectJson: string): Promise<void> {
+export async function applyEdits(_projectJson: string): Promise<void> {
   // Not implemented in Electron backend yet
   console.warn('applyEdits not implemented');
 }
@@ -85,22 +85,39 @@ export async function listenExportProgress(
   return window.electronAPI.onExportProgress(handler);
 }
 
-// Screen recording - deferred, not yet implemented
+// Screen recording
 export async function listCaptureDevices(): Promise<ListDevices> {
-  throw new Error('Screen recording not yet implemented');
+  return window.electronAPI.listCaptureDevices();
 }
 
 export async function startScreenRecord(settings: RecordSettings): Promise<{ recordingId: string; outPath: string }> {
-  throw new Error('Screen recording not yet implemented');
+  return window.electronAPI.startScreenRecord(settings);
 }
 
 export async function stopScreenRecord(recordingId: string): Promise<string> {
-  throw new Error('Screen recording not yet implemented');
+  return window.electronAPI.stopScreenRecord(recordingId);
+}
+
+export async function listenStartRecording(
+  handler: (event: { recordingId: string; sourceId: string; outputPath: string; settings: RecordSettings }) => void
+): Promise<() => void> {
+  return window.electronAPI.onStartRecording(handler);
+}
+
+export async function listenStopRecording(
+  handler: (event: { recordingId: string }) => void
+): Promise<() => void> {
+  return window.electronAPI.onStopRecording(handler);
 }
 
 // File ingestion
 export async function ingestFiles(request: IngestRequest): Promise<IngestResult[]> {
   return window.electronAPI.ingestFiles(request);
+}
+
+// Save blob to file
+export async function saveBlobToFile(blobData: ArrayBuffer, filePath: string): Promise<{ success: boolean; path: string }> {
+  return window.electronAPI.saveBlobToFile(blobData, filePath);
 }
 
 // Type declaration for Electron API
@@ -111,7 +128,13 @@ declare global {
       generatePreview: (projectJson: string, atMs: number) => Promise<PreviewResult>;
       exportProject: (projectJson: string, settings: ExportSettings) => Promise<ExportResult>;
       ingestFiles: (request: IngestRequest) => Promise<IngestResult[]>;
+      saveBlobToFile: (blobData: ArrayBuffer, filePath: string) => Promise<{ success: boolean; path: string }>;
+      listCaptureDevices: () => Promise<ListDevices>;
+      startScreenRecord: (settings: RecordSettings) => Promise<{ recordingId: string; outPath: string }>;
+      stopScreenRecord: (recordingId: string) => Promise<string>;
       onExportProgress: (callback: (event: ProgressEvent) => void) => () => void;
+      onStartRecording: (callback: (event: { recordingId: string; sourceId: string; outputPath: string; settings: RecordSettings }) => void) => () => void;
+      onStopRecording: (callback: (event: { recordingId: string }) => void) => () => void;
     };
   }
 }

@@ -13,9 +13,9 @@ interface UploadModalProps {
 export function UploadModal({ open, onOpenChange }: UploadModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragCounter, setDragCounter] = useState(0);
+  const [, setDragCounter] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const { addAssets, addAssetsFromPaths } = useProjectStore();
+  const { addAssets } = useProjectStore();
 
   // Handle native file drop events from outside the app
   useEffect(() => {
@@ -66,7 +66,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     setIsUploading(true);
     try {
       // Convert FileList to file paths for backend ingestion
-      const filePaths: string[] = [];
+      // const filePaths: string[] = [];
       
       // For external files, we need to get their paths
       // This is a limitation of web APIs - we can't get file paths directly

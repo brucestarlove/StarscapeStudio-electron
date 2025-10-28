@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { getMediaMetadata, generatePreview, exportProject, listenExportProgress, listCaptureDevices, startScreenRecord, stopScreenRecord } from "@/lib/bindings";
+import { useState, useEffect } from "react";
+import { getMediaMetadata, generatePreview, exportProject, listenExportProgress, listCaptureDevices, startScreenRecord, stopScreenRecord, listenStartRecording, listenStopRecording, saveBlobToFile } from "@/lib/bindings";
 import projectJsonRaw from "../../example/starproj-sample.json?raw";
 
 export function DebugPanel() {
@@ -7,8 +7,104 @@ export function DebugPanel() {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [exportPath, setExportPath] = useState<string>("");
   const [recordingId, setRecordingId] = useState<string>("");
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
 
   const append = (msg: unknown) => setLogs((l) => l + "\n" + JSON.stringify(msg));
+
+  // Set up recording event listeners
+  useEffect(() => {
+    let startUnlisten: (() => void) | undefined;
+    let stopUnlisten: (() => void) | undefined;
+
+    const setupListeners = async () => {
+      startUnlisten = await listenStartRecording(async (event) => {
+        try {
+          append({ recordingEvent: 'start', ...event });
+          
+          // Get the screen source
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false, // We'll add audio support later
+            video: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: event.sourceId,
+                minWidth: 1280,
+                maxWidth: 1920,
+                minHeight: 720,
+                maxHeight: 1080,
+                minFrameRate: event.settings.fps || 30,
+                maxFrameRate: event.settings.fps || 30
+              }
+            } as any
+          });
+
+          setRecordingStream(stream);
+
+          // Create MediaRecorder
+          const recorder = new MediaRecorder(stream, {
+            mimeType: 'video/webm;codecs=vp9'
+          });
+
+          const chunks: Blob[] = [];
+          
+          recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+              chunks.push(e.data);
+            }
+          };
+
+          recorder.onstop = async () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            
+            try {
+              // Convert blob to ArrayBuffer
+              const arrayBuffer = await blob.arrayBuffer();
+              
+              // Save to the specified path
+              const result = await saveBlobToFile(arrayBuffer, event.outputPath);
+              append({ recordingStopped: { recordingId: event.recordingId, blobSize: blob.size, savedPath: result.path } });
+            } catch (error) {
+              append({ recordingError: `Failed to save recording: ${error}` });
+            }
+            
+            // Clean up
+            if (recordingStream) {
+              recordingStream.getTracks().forEach(track => track.stop());
+              setRecordingStream(null);
+            }
+            setMediaRecorder(null);
+          };
+
+          setMediaRecorder(recorder);
+          recorder.start(1000); // Record in 1-second chunks
+          
+        } catch (error) {
+          append({ recordingError: String(error) });
+        }
+      });
+
+      stopUnlisten = await listenStopRecording((event) => {
+        try {
+          append({ recordingEvent: 'stop', ...event });
+          
+          if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+          }
+          
+        } catch (error) {
+          append({ recordingError: String(error) });
+        }
+      });
+    };
+
+    setupListeners();
+
+    return () => {
+      if (startUnlisten) startUnlisten();
+      if (stopUnlisten) stopUnlisten();
+    };
+  }, [mediaRecorder, recordingStream]);
 
   const handleMetadata = async () => {
     try {
@@ -52,7 +148,7 @@ export function DebugPanel() {
         append({ devices });
         const { recordingId: id, outPath } = await startScreenRecord({ 
           fps: 30, 
-          display_index: 1, 
+          display_index: 0,  // Use first display
           audio_index: 0  // 0 = no audio, 1+ = mic index
         });
         setRecordingId(id);
