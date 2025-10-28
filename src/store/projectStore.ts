@@ -17,7 +17,7 @@ interface ProjectStore extends ProjectState {
   updateTrack: (trackId: string, updates: Partial<Track>) => void;
   
   // Clip actions
-  createClip: (assetId: string, trackId: string, startMs: number) => void;
+  createClip: (assetId: string, trackId: string, startMs: number) => string;
   updateClip: (clipId: string, updates: Partial<Clip>) => void;
   deleteClip: (clipId: string) => void;
   moveClip: (clipId: string, trackId: string, startMs: number) => void;
@@ -247,13 +247,14 @@ export const useProjectStore = create<ProjectStore>()(
       
       // Clip actions
       createClip: (assetId: string, trackId: string, startMs: number) => {
+        let clipId = '';
         set((state) => {
           const asset = state.assets.find((a: Asset) => a.id === assetId);
           const track = state.tracks.find((t: Track) => t.id === trackId);
           
           if (!asset || !track) return;
           
-          const clipId = generateId();
+          clipId = generateId();
           const clip: Clip = {
             id: clipId,
             assetId,
@@ -281,6 +282,7 @@ export const useProjectStore = create<ProjectStore>()(
             opacity: 1,
           };
         });
+        return clipId;
       },
       
       updateClip: (clipId: string, updates: Partial<Clip>) => {

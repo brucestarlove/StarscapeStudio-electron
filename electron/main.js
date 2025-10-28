@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog } = require('electron');
 const path = require('path');
 const squirrelStartup = require('electron-squirrel-startup');
 
@@ -491,6 +491,47 @@ ipcMain.handle('ingest-files', async (event, request) => {
     return results;
   } catch (error) {
     throw new Error(`Failed to ingest files: ${error}`);
+  }
+});
+
+/**
+ * Apply edits to project (placeholder implementation)
+ */
+ipcMain.handle('apply-edits', async (event, projectJson) => {
+  try {
+    // For now, this is a placeholder - in a real implementation,
+    // this would process the project JSON and apply any pending edits
+    console.log('Apply edits called with project:', JSON.parse(projectJson));
+    return { success: true };
+  } catch (error) {
+    throw new Error(`Failed to apply edits: ${error.message}`);
+  }
+});
+
+/**
+ * Open file dialog to select media files
+ */
+ipcMain.handle('open-file-dialog', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Media Files', extensions: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'mp3', 'wav', 'aac', 'flac', 'ogg', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'] },
+        { name: 'Video Files', extensions: ['mp4', 'mov', 'avi', 'mkv', 'webm'] },
+        { name: 'Audio Files', extensions: ['mp3', 'wav', 'aac', 'flac', 'ogg'] },
+        { name: 'Image Files', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+      return { filePaths: result.filePaths };
+    }
+    
+    return { filePaths: [] };
+  } catch (error) {
+    console.error('Error opening file dialog:', error);
+    throw new Error(`Failed to open file dialog: ${error.message}`);
   }
 });
 

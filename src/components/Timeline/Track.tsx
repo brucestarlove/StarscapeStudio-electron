@@ -10,7 +10,7 @@ interface TrackProps {
 }
 
 export function Track({ trackId }: TrackProps) {
-  const { tracks, getClipsByTrack } = useProjectStore();
+  const { tracks, getClipsByTrack, updateTrack } = useProjectStore();
   
   const track = tracks.find(t => t.id === trackId);
   const clips = getClipsByTrack(trackId);
@@ -35,12 +35,21 @@ export function Track({ trackId }: TrackProps) {
 
   const Icon = getTrackIcon(track.type);
 
+  const handleToggleVisibility = () => {
+    updateTrack(trackId, { visible: !track.visible });
+  };
+
+  const handleToggleLock = () => {
+    updateTrack(trackId, { locked: !track.locked });
+  };
+
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "timeline-track h-16 flex items-center",
-        isOver && "bg-gradient-cyan-purple/20 border-light-blue"
+        "timeline-track h-20 flex items-center bg-gradient-to-r from-mid-navy/50 to-mid-navy/30 border-b border-white/5 hover:from-mid-navy/70 hover:to-mid-navy/50 transition-all duration-200",
+        isOver && "bg-gradient-cyan-purple/20 border-light-blue",
+        !track.visible && "opacity-50"
       )}
     >
       {/* Track header */}
@@ -54,7 +63,11 @@ export function Track({ trackId }: TrackProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-white/50 hover:text-white"
+            className={cn(
+              "h-6 w-6 hover:text-white transition-colors",
+              track.visible ? "text-white" : "text-white/30"
+            )}
+            onClick={handleToggleVisibility}
           >
             <Eye className="h-3 w-3" />
           </Button>
@@ -62,7 +75,11 @@ export function Track({ trackId }: TrackProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-white/50 hover:text-white"
+            className={cn(
+              "h-6 w-6 hover:text-white transition-colors",
+              track.locked ? "text-white" : "text-white/30"
+            )}
+            onClick={handleToggleLock}
           >
             <Lock className="h-3 w-3" />
           </Button>

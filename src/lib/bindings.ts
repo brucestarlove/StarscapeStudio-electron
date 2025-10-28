@@ -37,8 +37,15 @@ export interface ProgressEvent {
   message: string;
 }
 
+export interface DisplayDevice {
+  id: string;
+  name: string;
+  thumbnail: string;
+  index: number;
+}
+
 export interface ListDevices {
-  displays: string[];
+  displays: DisplayDevice[];
   audio_inputs: string[];
 }
 
@@ -63,9 +70,8 @@ export async function getMediaMetadata(path: string): Promise<MediaMeta> {
   return window.electronAPI.getMediaMetadata(path);
 }
 
-export async function applyEdits(_projectJson: string): Promise<void> {
-  // Not implemented in Electron backend yet
-  console.warn('applyEdits not implemented');
+export async function applyEdits(projectJson: string): Promise<{ success: boolean }> {
+  return window.electronAPI.applyEdits(projectJson);
 }
 
 export async function generatePreview(projectJson: string, atMs: number): Promise<PreviewResult> {
@@ -115,6 +121,11 @@ export async function ingestFiles(request: IngestRequest): Promise<IngestResult[
   return window.electronAPI.ingestFiles(request);
 }
 
+// Open file dialog
+export async function openFileDialog(): Promise<{ filePaths: string[] }> {
+  return window.electronAPI.openFileDialog();
+}
+
 // Save blob to file
 export async function saveBlobToFile(blobData: ArrayBuffer, filePath: string): Promise<{ success: boolean; path: string }> {
   return window.electronAPI.saveBlobToFile(blobData, filePath);
@@ -125,9 +136,11 @@ declare global {
   interface Window {
     electronAPI: {
       getMediaMetadata: (path: string) => Promise<MediaMeta>;
+      applyEdits: (projectJson: string) => Promise<{ success: boolean }>;
       generatePreview: (projectJson: string, atMs: number) => Promise<PreviewResult>;
       exportProject: (projectJson: string, settings: ExportSettings) => Promise<ExportResult>;
       ingestFiles: (request: IngestRequest) => Promise<IngestResult[]>;
+      openFileDialog: () => Promise<{ filePaths: string[] }>;
       saveBlobToFile: (blobData: ArrayBuffer, filePath: string) => Promise<{ success: boolean; path: string }>;
       listCaptureDevices: () => Promise<ListDevices>;
       startScreenRecord: (settings: RecordSettings) => Promise<{ recordingId: string; outPath: string }>;

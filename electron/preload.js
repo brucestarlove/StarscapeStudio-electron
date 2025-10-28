@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Media operations
   getMediaMetadata: (path) => ipcRenderer.invoke('get-media-metadata', path),
   
+  applyEdits: (projectJson) => ipcRenderer.invoke('apply-edits', projectJson),
+  
   generatePreview: (projectJson, atMs) =>
     ipcRenderer.invoke('generate-preview', projectJson, atMs),
   
@@ -15,6 +17,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // File ingestion
   ingestFiles: (request) => ipcRenderer.invoke('ingest-files', request),
+  
+  // File dialog
+  openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
   
   // Save blob to file
   saveBlobToFile: (blobData, filePath) => ipcRenderer.invoke('save-blob-to-file', blobData, filePath),

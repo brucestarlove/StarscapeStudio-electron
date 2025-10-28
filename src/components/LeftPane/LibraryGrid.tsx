@@ -1,7 +1,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Play, Image, Music, Video } from "lucide-react";
+import { Plus, Play, Image, Music, Video, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { formatTimecode } from "@/lib/utils";
@@ -71,7 +71,7 @@ interface LibraryGridProps {
 }
 
 export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
-  const { assets, createClip, createCanvasNode } = useProjectStore();
+  const { assets, createClip, clearProject } = useProjectStore();
   const { currentTimeMs } = usePlaybackStore();
   const { leftPaneCollapsed, setLeftPaneCollapsed } = useUiStore();
 
@@ -81,17 +81,27 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
   };
 
   const handleAssetDoubleClick = (asset: Asset) => {
-    const videoTrack = useProjectStore.getState().tracks.find(t => t.type === 'video');
+    const state = useProjectStore.getState();
+    const videoTrack = state.tracks.find(t => t.type === 'video');
     if (videoTrack) {
-      createClip(asset.id, videoTrack.id, currentTimeMs);
-      createCanvasNode(asset.id);
+      // Create clip and get the returned clipId
+      const clipId = createClip(asset.id, videoTrack.id, currentTimeMs);
+      
+      // Canvas node is already created in createClip action, no need to create again
+      console.log(`Created clip ${clipId} for asset ${asset.name}`);
+    }
+  };
+
+  const handleClearAll = () => {
+    if (window.confirm('Are you sure you want to clear all assets and reset the project? This cannot be undone.')) {
+      clearProject();
     }
   };
 
   return (
     <div className="h-full flex flex-col">
       {/* Upload button */}
-      <div className="p-md">
+      <div className="p-md space-y-sm">
         <Button
           variant="outline"
           className="w-full h-20 flex flex-col items-center justify-center space-y-sm border-dashed border-2 border-light-blue/50 hover:border-light-blue hover:bg-light-blue/10"
@@ -100,6 +110,18 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
           <Plus className="h-6 w-6 text-light-blue" />
           <span className="text-light-blue font-medium">Upload Media</span>
         </Button>
+        
+        {assets.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            onClick={handleClearAll}
+          >
+            <Trash2 className="h-4 w-4 mr-xs" />
+            Clear All Assets
+          </Button>
+        )}
       </div>
 
       {/* Assets grid */}

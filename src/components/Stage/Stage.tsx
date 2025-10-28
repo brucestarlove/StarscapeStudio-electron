@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { Play } from "lucide-react";
+import { Play, Music } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { useEffect, useRef } from "react";
@@ -71,8 +71,18 @@ export function Stage() {
                       console.error('Video playback error:', e);
                     }}
                   />
+                ) : visibleAsset && visibleAsset.type === 'image' ? (
+                  /* Image display */
+                  <img
+                    src={visibleAsset.url}
+                    alt={visibleAsset.name}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      console.error('Image load error:', e);
+                    }}
+                  />
                 ) : (
-                  /* Canvas nodes for non-video assets */
+                  /* Canvas nodes for other assets */
                   Object.values(canvasNodes).map((node) => {
                     const clip = clips[node.clipId];
                     const asset = clip ? getAssetById(clip.assetId) : null;
@@ -88,10 +98,18 @@ export function Stage() {
                           opacity: node.opacity,
                         }}
                       >
-                        <div className="w-48 h-36 bg-gradient-purple-blue rounded-md flex items-center justify-center">
-                          {asset.type === 'audio' && <div className="text-white text-caption">Audio</div>}
-                          {asset.type === 'image' && <div className="text-white text-caption">Image</div>}
-                        </div>
+                        {asset.type === 'audio' ? (
+                          <div className="w-48 h-36 bg-gradient-purple-blue rounded-md flex items-center justify-center">
+                            <Music className="h-12 w-12 text-white/70" />
+                            <div className="text-white text-caption ml-2">Audio</div>
+                          </div>
+                        ) : asset.type === 'image' ? (
+                          <img
+                            src={asset.url}
+                            alt={asset.name}
+                            className="w-full h-full object-contain rounded-md"
+                          />
+                        ) : null}
                       </div>
                     );
                   })
@@ -118,7 +136,7 @@ export function Stage() {
 
 // Helper function to find visible clip at current time
 function getVisibleClip(clips: Record<string, Clip>, tracks: any[], currentTimeMs: number): Clip | null {
-  for (const track of tracks.filter(t => t.type === 'video')) {
+  for (const track of tracks.filter(t => t.type === 'video' && t.visible)) {
     const clip = track.clips
       .map((id: string) => clips[id])
       .find((c: Clip) => c && currentTimeMs >= c.startMs && currentTimeMs < c.endMs);
