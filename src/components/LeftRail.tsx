@@ -5,7 +5,7 @@ import { useUiStore } from "@/store/uiStore";
 import type { LeftPaneTab } from "@/store/uiStore";
 
 export function LeftRail() {
-  const { setLeftPaneCollapsed, activeLeftPaneTab, setActiveLeftPaneTab } = useUiStore();
+  const { leftPaneCollapsed, setLeftPaneCollapsed, activeLeftPaneTab, setActiveLeftPaneTab } = useUiStore();
 
   const tabs = [
     { id: 'library' as const, icon: FolderOpen, label: 'Library', disabled: false },
@@ -13,8 +13,14 @@ export function LeftRail() {
   ];
 
   const handleTabClick = (tabId: LeftPaneTab) => {
-    setActiveLeftPaneTab(tabId);
-    setLeftPaneCollapsed(false);
+    // If clicking the active tab and pane is expanded, collapse it
+    if (activeLeftPaneTab === tabId && !leftPaneCollapsed) {
+      setLeftPaneCollapsed(true);
+    } else {
+      // Otherwise, set as active tab and expand pane
+      setActiveLeftPaneTab(tabId);
+      setLeftPaneCollapsed(false);
+    }
   };
 
   return (
