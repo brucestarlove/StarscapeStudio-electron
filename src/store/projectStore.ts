@@ -82,6 +82,7 @@ const initialProjectState: ProjectState = {
   clips: {},
   canvasNodes: {},
   selectedClipIds: [],
+  selectedTrackId: null,
 };
 
 export const useProjectStore = create<ProjectStore>()(
@@ -479,18 +480,31 @@ export const useProjectStore = create<ProjectStore>()(
       selectClips: (clipIds: string[]) => {
         set((state) => {
           state.selectedClipIds = clipIds;
+          // Track the track of the first selected clip
+          if (clipIds.length > 0) {
+            const firstClip = state.clips[clipIds[0]];
+            if (firstClip) {
+              state.selectedTrackId = firstClip.trackId;
+            }
+          }
         });
       },
 
       selectClip: (clipId: string) => {
         set((state) => {
           state.selectedClipIds = [clipId];
+          // Track the track of the selected clip
+          const clip = state.clips[clipId];
+          if (clip) {
+            state.selectedTrackId = clip.trackId;
+          }
         });
       },
 
       deselectAll: () => {
         set((state) => {
           state.selectedClipIds = [];
+          state.selectedTrackId = null;
         });
       },
 

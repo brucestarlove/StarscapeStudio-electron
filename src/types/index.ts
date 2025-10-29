@@ -54,6 +54,7 @@ export interface ProjectState {
   clips: Record<string, Clip>;
   canvasNodes: Record<string, CanvasNode>;
   selectedClipIds: string[];
+  selectedTrackId: string | null;
 }
 
 export interface PlaybackState {

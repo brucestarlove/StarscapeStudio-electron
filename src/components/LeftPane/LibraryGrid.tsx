@@ -158,22 +158,70 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
 
   const handleAssetDoubleClick = (asset: Asset) => {
     const state = useProjectStore.getState();
-    const videoTrack = state.tracks.find(t => t.type === 'video');
-    if (videoTrack) {
+
+    // Use selected track if available, otherwise fall back to first video track
+    let targetTrack = null;
+    if (state.selectedTrackId) {
+      targetTrack = state.tracks.find(t => t.id === state.selectedTrackId);
+    }
+    if (!targetTrack) {
+      targetTrack = state.tracks.find(t => t.type === 'video');
+    }
+
+    if (targetTrack) {
+      // Get all clips on the target track to find the end position
+      const trackClips = state.tracks
+        .filter(t => t.id === targetTrack.id)
+        .flatMap(t => t.clips)
+        .map(id => state.clips[id])
+        .filter(clip => clip !== undefined)
+        .sort((a, b) => b.endMs - a.endMs); // Sort by end time, descending
+
+      // Calculate where to place the clip (after all existing clips, or at currentTime if earlier)
+      let insertPosition = currentTimeMs;
+      if (trackClips.length > 0) {
+        const lastClipEnd = trackClips[0].endMs;
+        insertPosition = Math.max(currentTimeMs, lastClipEnd);
+      }
+
       // Create clip and get the returned clipId
-      const clipId = createClip(asset.id, videoTrack.id, currentTimeMs);
+      const clipId = createClip(asset.id, targetTrack.id, insertPosition);
 
       // Canvas node is already created in createClip action, no need to create again
-      console.log(`Created clip ${clipId} for asset ${asset.name}`);
+      console.log(`Created clip ${clipId} for asset ${asset.name} at ${insertPosition}ms`);
     }
   };
 
   const handleAddToTimeline = (asset: Asset) => {
     const state = useProjectStore.getState();
-    const videoTrack = state.tracks.find(t => t.type === 'video');
-    if (videoTrack) {
-      const clipId = createClip(asset.id, videoTrack.id, currentTimeMs);
-      console.log(`Added clip ${clipId} for asset ${asset.name} to timeline`);
+
+    // Use selected track if available, otherwise fall back to first video track
+    let targetTrack = null;
+    if (state.selectedTrackId) {
+      targetTrack = state.tracks.find(t => t.id === state.selectedTrackId);
+    }
+    if (!targetTrack) {
+      targetTrack = state.tracks.find(t => t.type === 'video');
+    }
+
+    if (targetTrack) {
+      // Get all clips on the target track to find the end position
+      const trackClips = state.tracks
+        .filter(t => t.id === targetTrack.id)
+        .flatMap(t => t.clips)
+        .map(id => state.clips[id])
+        .filter(clip => clip !== undefined)
+        .sort((a, b) => b.endMs - a.endMs); // Sort by end time, descending
+
+      // Calculate where to place the clip (after all existing clips, or at currentTime if earlier)
+      let insertPosition = currentTimeMs;
+      if (trackClips.length > 0) {
+        const lastClipEnd = trackClips[0].endMs;
+        insertPosition = Math.max(currentTimeMs, lastClipEnd);
+      }
+
+      const clipId = createClip(asset.id, targetTrack.id, insertPosition);
+      console.log(`Added clip ${clipId} for asset ${asset.name} to timeline at ${insertPosition}ms`);
     }
   };
 
