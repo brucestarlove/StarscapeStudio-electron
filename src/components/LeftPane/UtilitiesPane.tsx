@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { startScreenRecord, stopScreenRecord, listenStartRecording, listenStopRecording, saveBlobToFile, revealInFinder } from "@/lib/bindings";
 import { useUiStore } from "@/store/uiStore";
+import { useProjectStore } from "@/store/projectStore";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle } from "lucide-react";
@@ -203,7 +204,7 @@ export function UtilitiesPane() {
       {/* Success Modal */}
       {recordingSuccess && (
         <Dialog open={!!recordingSuccess} onOpenChange={() => setRecordingSuccess(null)}>
-          <DialogContent className="max-w-xl min-w-[500px]">
+          <DialogContent className="max-w-xxl min-w-[500px]">
             <DialogHeader>
               <DialogTitle className="text-h3 font-semibold gradient-text">
                 Recording Saved
@@ -227,6 +228,21 @@ export function UtilitiesPane() {
                   onClick={() => setRecordingSuccess(null)}
                 >
                   Close
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    // Import the recording to the project library
+                    const { addAssetsFromPaths } = useProjectStore.getState();
+                    try {
+                      await addAssetsFromPaths([recordingSuccess.path]);
+                      setRecordingSuccess(null);
+                    } catch (error) {
+                      console.error('Error importing recording:', error);
+                    }
+                  }}
+                >
+                  Import to Library
                 </Button>
                 <Button
                   variant="gradient"

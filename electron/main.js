@@ -517,14 +517,67 @@ ipcMain.handle('export-project', async (event, projectJson, settings) => {
 });
 
 /**
- * Save blob data to file
+ * Convert WebM to MP4 using ffmpeg
+ */
+function convertWebmToMp4(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = require('fluent-ffmpeg');
+    
+    console.log(`Converting WebM to MP4: ${inputPath} -> ${outputPath}`);
+    
+    const command = ffmpeg(inputPath)
+      .videoCodec('libx264')
+      .audioCodec('aac')
+      .outputOptions([
+        '-preset fast',
+        '-crf 23',
+        '-movflags +faststart'
+      ])
+      .output(outputPath)
+      .on('start', (commandLine) => {
+        console.log('FFmpeg command:', commandLine);
+      })
+      .on('progress', (progress) => {
+        if (progress.percent) {
+          console.log(`Conversion progress: ${Math.round(progress.percent)}%`);
+        }
+      })
+      .on('end', () => {
+        console.log('WebM to MP4 conversion completed');
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error('Conversion error:', err);
+        reject(new Error(`FFmpeg conversion failed: ${err.message}`));
+      });
+    
+    // Track the process
+    const process = command.run();
+    trackProcess(process);
+  });
+}
+
+/**
+ * Save blob data to file (converts WebM to MP4 for screen recordings)
  */
 ipcMain.handle('save-blob-to-file', async (event, blobData, filePath) => {
   try {
     const fs = require('fs');
     const buffer = Buffer.from(blobData);
+    
+    // Save the blob to the original file path (WebM)
     await fs.promises.writeFile(filePath, buffer);
-    return { success: true, path: filePath };
+    console.log(`Saved WebM recording to: ${filePath}`);
+    
+    // Convert WebM to MP4 for better compatibility
+    const mp4Path = filePath.replace('.webm', '.mp4');
+    await convertWebmToMp4(filePath, mp4Path);
+    
+    // Delete the original WebM file
+    await fs.promises.unlink(filePath);
+    console.log(`Deleted temporary WebM file: ${filePath}`);
+    
+    return { success: true, path: mp4Path };
   } catch (error) {
     throw new Error(`Failed to save blob to file: ${error.message}`);
   }
