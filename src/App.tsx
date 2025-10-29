@@ -15,7 +15,7 @@ import { Play, Music, Image } from "lucide-react";
 import "./globals.css";
 
 function App() {
-  const { createClip, moveClip, trimClip, deleteClip, getSelectedClips, getAssetById, getClipsByTrack } = useProjectStore();
+  const { createClip, moveClip, trimClip, deleteClip, getSelectedClips, getAssetById, getClipsByTrack, shiftClipsRight } = useProjectStore();
   const { activeLeftPaneTab } = useUiStore();
   const [playheadDragStartX, setPlayheadDragStartX] = useState<number | null>(null);
   const [lastDragX, setLastDragX] = useState<number>(0);
@@ -231,39 +231,78 @@ function App() {
     if (dragItem.type === 'asset' && dropResult.trackId) {
       // Create new clip from asset - check for collisions
       const { assets } = useProjectStore.getState();
+      const { zoom } = usePlaybackStore.getState();
       const asset = assets.find(a => a.id === dragItem.id);
 
       if (asset) {
         const trackClips = getClipsByTrack(dropResult.trackId);
         const clipDuration = asset.duration;
 
-        // Resolve collision by snapping to end of overlapping clip
-        const resolvedPosition = resolveClipCollision(
+        // Convert mouse offset from pixels to milliseconds
+        const mouseOffsetMs = activeDragItem ? pixelsToMs(activeDragItem.offsetX, zoom) : undefined;
+
+        // Resolve collision with smart insertion
+        const resolution = resolveClipCollision(
           positionMs,
           clipDuration,
-          trackClips
+          trackClips,
+          undefined,
+          mouseOffsetMs
         );
 
-        createClip(dragItem.id, dropResult.trackId, resolvedPosition);
+        // If drop should be cancelled, don't create the clip
+        if (resolution.shouldCancel) {
+          console.log('Drop cancelled - would overlap existing clip');
+          setClipDragData(null);
+          setActiveDragItem(null);
+          return;
+        }
+
+        // If we need to insert before a clip, shift it and subsequent clips first
+        if (resolution.shouldShift && resolution.targetClipId) {
+          shiftClipsRight(dropResult.trackId, resolution.targetClipId, resolution.shiftAmount!);
+        }
+
+        // Create the clip at the resolved position
+        createClip(dragItem.id, dropResult.trackId, resolution.resolvedStartMs);
       }
     } else if (dragItem.type === 'clip' && dropResult.trackId) {
       // Move existing clip - check for collisions
       const { clips } = useProjectStore.getState();
+      const { zoom } = usePlaybackStore.getState();
       const clip = clips[dragItem.id];
 
       if (clip) {
         const trackClips = getClipsByTrack(dropResult.trackId);
         const clipDuration = clip.endMs - clip.startMs;
 
-        // Resolve collision by snapping to end of overlapping clip (exclude the clip being moved)
-        const resolvedPosition = resolveClipCollision(
+        // Convert mouse offset from pixels to milliseconds
+        const mouseOffsetMs = activeDragItem ? pixelsToMs(activeDragItem.offsetX, zoom) : undefined;
+
+        // Resolve collision with smart insertion (exclude the clip being moved)
+        const resolution = resolveClipCollision(
           positionMs,
           clipDuration,
           trackClips,
-          dragItem.id
+          dragItem.id,
+          mouseOffsetMs
         );
 
-        moveClip(dragItem.id, dropResult.trackId, resolvedPosition);
+        // If drop should be cancelled, don't move the clip (it stays where it was)
+        if (resolution.shouldCancel) {
+          console.log('Drop cancelled - would overlap existing clip');
+          setClipDragData(null);
+          setActiveDragItem(null);
+          return;
+        }
+
+        // If we need to insert before a clip, shift it and subsequent clips first
+        if (resolution.shouldShift && resolution.targetClipId) {
+          shiftClipsRight(dropResult.trackId, resolution.targetClipId, resolution.shiftAmount!);
+        }
+
+        // Move the clip to the resolved position
+        moveClip(dragItem.id, dropResult.trackId, resolution.resolvedStartMs);
       }
     } else if (dragItem.type === 'trim-handle' && dragItem.clipId) {
       // Handle trim operation

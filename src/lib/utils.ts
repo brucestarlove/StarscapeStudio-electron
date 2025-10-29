@@ -117,27 +117,95 @@ export function detectClipCollision(
   return { hasCollision: false };
 }
 
-// Resolve clip collision by snapping to the end of the colliding clip
+// Resolve clip collision with smart insertion
+// Returns the resolved position and information about what clips need to be shifted
 export function resolveClipCollision(
   desiredStartMs: number,
   clipDuration: number,
   trackClips: Array<{ id: string; startMs: number; endMs: number }>,
-  excludeClipId?: string
-): number {
+  excludeClipId?: string,
+  mouseOffsetMs?: number
+): {
+  resolvedStartMs: number;
+  shouldShift: boolean;
+  shouldCancel: boolean;
+  targetClipId?: string;
+  shiftAmount?: number;
+} {
   const desiredEndMs = desiredStartMs + clipDuration;
 
   // Check for collision
   const collision = detectClipCollision(desiredStartMs, desiredEndMs, trackClips, excludeClipId);
 
   if (collision.hasCollision && collision.collidingClip) {
-    // Find the clip that the user is trying to drop onto
     const targetClip = collision.collidingClip;
+    const targetClipMidpoint = targetClip.startMs + ((targetClip.endMs - targetClip.startMs) / 2);
 
-    // Snap to the end of the target clip
-    return targetClip.endMs;
+    // Calculate where the mouse cursor actually is relative to the clip being dragged
+    // mouseOffsetMs is how far into the dragged clip the user grabbed it
+    const mouseCursorMs = desiredStartMs + (mouseOffsetMs ?? clipDuration / 2);
+
+    // Determine if mouse cursor is on left or right half of target clip
+    const dropOnLeftHalf = mouseCursorMs < targetClipMidpoint;
+
+    if (dropOnLeftHalf) {
+      // User wants to insert before the target clip
+      const proposedStartMs = targetClip.startMs - clipDuration;
+
+      // Check if we can fit to the left without shifting (no overlap with earlier clips)
+      if (proposedStartMs >= 0) {
+        const proposedEndMs = targetClip.startMs;
+        const wouldOverlapEarlier = detectClipCollision(
+          proposedStartMs,
+          proposedEndMs,
+          trackClips,
+          excludeClipId
+        );
+
+        if (!wouldOverlapEarlier.hasCollision) {
+          // We can fit to the left without shifting - just place it there
+          return {
+            resolvedStartMs: proposedStartMs,
+            shouldShift: false,
+            shouldCancel: false
+          };
+        }
+      }
+
+      // Can't fit to the left without overlapping - check if we're at timeline start
+      if (targetClip.startMs === 0) {
+        // Target is at position 0, we need to shift it right
+        return {
+          resolvedStartMs: 0,
+          shouldShift: true,
+          shouldCancel: false,
+          targetClipId: targetClip.id,
+          shiftAmount: clipDuration
+        };
+      }
+
+      // There's another clip to the left that would overlap - cancel the drop
+      return {
+        resolvedStartMs: desiredStartMs,
+        shouldShift: false,
+        shouldCancel: true
+      };
+    } else {
+      // Drop on right half - place after the target clip (original behavior)
+      return {
+        resolvedStartMs: targetClip.endMs,
+        shouldShift: false,
+        shouldCancel: false
+      };
+    }
   }
 
-  return desiredStartMs;
+  // No collision - use desired position
+  return {
+    resolvedStartMs: desiredStartMs,
+    shouldShift: false,
+    shouldCancel: false
+  };
 }
 
 // Format file size in human-readable format
