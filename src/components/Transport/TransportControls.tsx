@@ -185,6 +185,7 @@ export function TransportControls() {
             size="icon"
             onClick={() => setZoom(Math.max(0.01, zoom / 1.5))}
             className="text-white hover:bg-light-blue/20"
+            title="Zoom out (Shift + scroll to zoom)"
           >
             <ZoomOut className="h-4 w-4" />
           </Button>
@@ -205,6 +206,7 @@ export function TransportControls() {
             size="icon"
             onClick={() => setZoom(Math.min(2, zoom * 1.5))}
             className="text-white hover:bg-light-blue/20"
+            title="Zoom in (Shift + scroll to zoom)"
           >
             <ZoomIn className="h-4 w-4" />
           </Button>
