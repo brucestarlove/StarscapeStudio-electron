@@ -45,6 +45,32 @@ function App() {
     };
   }, []);
 
+  // Handle spacebar for play/pause toggle
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        // Prevent spacebar from triggering when typing in input fields
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return;
+        }
+
+        e.preventDefault();
+        const { playing, play, pause } = usePlaybackStore.getState();
+        if (playing) {
+          pause();
+        } else {
+          play();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   // Handle Delete key for deleting selected clips
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -101,8 +127,11 @@ function App() {
     const dragItem = active.data.current as DragItem;
 
     if (dragItem.type === 'playhead') {
+      // Pause playback when user starts scrubbing
+      const { pause, currentTimeMs, zoom } = usePlaybackStore.getState();
+      pause();
+
       // Store initial position for playhead dragging - track last X for incremental updates
-      const { currentTimeMs, zoom } = usePlaybackStore.getState();
       const tracksScrollContainer = document.getElementById('tracks-scroll');
       if (tracksScrollContainer) {
         const rect = tracksScrollContainer.getBoundingClientRect();

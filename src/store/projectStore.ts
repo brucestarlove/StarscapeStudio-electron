@@ -401,28 +401,62 @@ export const useProjectStore = create<ProjectStore>()(
           const asset = state.assets.find((a: Asset) => a.id === clip.assetId);
           if (!asset) return;
 
+          const minClipDuration = 10; // minimum 10ms
+
           if (side === 'left') {
-            // Calculate new trim start, clamped to [0, asset.duration]
-            const newTrimStart = Math.max(0, Math.min(asset.duration, clip.trimStartMs + deltaMs));
-            // Calculate new startMs position on timeline, must not go below 0
-            const newStartMs = Math.max(0, clip.startMs + deltaMs);
+            // When trimming left, we adjust both trimStartMs and startMs by the same delta
+            // to maintain the invariant: (endMs - startMs) === (trimEndMs - trimStartMs)
 
-            // Ensure the left edge doesn't cross over the right edge
-            // The clip must have at least some duration (e.g., 10ms minimum)
-            const minClipDuration = 10; // minimum 10ms
-            if (newTrimStart < clip.trimEndMs - minClipDuration && newStartMs < clip.endMs - minClipDuration) {
-              clip.trimStartMs = newTrimStart;
-              clip.startMs = newStartMs;
+            // Calculate new trim start position in the source asset
+            let newTrimStart = clip.trimStartMs + deltaMs;
+
+            // Clamp to valid range [0, asset.duration]
+            newTrimStart = Math.max(0, Math.min(asset.duration, newTrimStart));
+
+            // Ensure we don't trim past the end (maintain minimum duration)
+            newTrimStart = Math.min(newTrimStart, clip.trimEndMs - minClipDuration);
+
+            // Calculate the actual delta we can apply (may be less than requested due to clamping)
+            const actualDelta = newTrimStart - clip.trimStartMs;
+
+            // Calculate new timeline start position
+            let newStartMs = clip.startMs + actualDelta;
+
+            // Ensure timeline position doesn't go below 0
+            newStartMs = Math.max(0, newStartMs);
+
+            // If timeline position was clamped, adjust trim start accordingly
+            if (newStartMs === 0 && clip.startMs + actualDelta < 0) {
+              const clampedDelta = -clip.startMs;
+              newTrimStart = clip.trimStartMs + clampedDelta;
             }
-          } else {
-            // Calculate new trim end, clamped to [0, asset.duration]
-            const newTrimEnd = Math.max(0, Math.min(asset.duration, clip.trimEndMs + deltaMs));
-            // Calculate new endMs position on timeline
-            const newEndMs = clip.endMs + deltaMs;
 
-            // Ensure the right edge doesn't cross over the left edge
-            const minClipDuration = 10; // minimum 10ms
-            if (newTrimEnd > clip.trimStartMs + minClipDuration && newEndMs > clip.startMs + minClipDuration) {
+            // Apply the trim, maintaining the invariant
+            clip.trimStartMs = newTrimStart;
+            clip.startMs = newStartMs;
+
+          } else {
+            // When trimming right, we adjust both trimEndMs and endMs by the same delta
+            // to maintain the invariant: (endMs - startMs) === (trimEndMs - trimStartMs)
+
+            // Calculate new trim end position in the source asset
+            let newTrimEnd = clip.trimEndMs + deltaMs;
+
+            // Clamp to valid range [0, asset.duration]
+            newTrimEnd = Math.max(0, Math.min(asset.duration, newTrimEnd));
+
+            // Ensure we don't trim past the start (maintain minimum duration)
+            newTrimEnd = Math.max(newTrimEnd, clip.trimStartMs + minClipDuration);
+
+            // Calculate the actual delta we can apply (may be less than requested due to clamping)
+            const actualDelta = newTrimEnd - clip.trimEndMs;
+
+            // Calculate new timeline end position
+            const newEndMs = clip.endMs + actualDelta;
+
+            // Ensure minimum clip duration on timeline
+            if (newEndMs > clip.startMs + minClipDuration) {
+              // Apply the trim, maintaining the invariant
               clip.trimEndMs = newTrimEnd;
               clip.endMs = newEndMs;
             }
