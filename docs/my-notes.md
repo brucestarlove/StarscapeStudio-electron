@@ -13,8 +13,8 @@ Refer to docs/ARCHITECTURE.md
 Build the best, most well-engineered frontend you can, supporting the MVP.
 
 
-[ ] smooth seeking
-[ ] smooth clipping
+[x] smooth seeking - implemented with requestAnimationFrame, clickable ruler, draggable playhead
+[x] smooth clipping - fixed trim handle sensitivity with incremental delta tracking
 [x] export including clipped!
 [ ] fix export modal style
 [ ] 

@@ -1,9 +1,9 @@
 import { usePlaybackStore } from "@/store/playbackStore";
-import { formatTimecode, msToPixels } from "@/lib/utils";
+import { formatTimecode, msToPixels, pixelsToMs, snapToTimeline } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export function Ruler() {
-  const { zoom } = usePlaybackStore();
+  const { zoom, seek, snapEnabled } = usePlaybackStore();
 
   // Generate time markers based on zoom level
   const generateMarkers = () => {
@@ -33,8 +33,21 @@ export function Ruler() {
 
   const markers = generateMarkers();
 
+  // Handle ruler click to seek
+  const handleRulerClick = (event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const timeMs = pixelsToMs(clickX, zoom);
+    const snappedTime = snapToTimeline(timeMs, zoom, snapEnabled);
+    seek(Math.max(0, snappedTime));
+  };
+
   return (
-    <div className="h-full relative bg-gradient-to-b from-mid-navy/90 to-dark-navy/90 min-w-[6000px]">
+    <div 
+      className="h-full relative bg-gradient-to-b from-mid-navy/90 to-dark-navy/90 min-w-[6000px] cursor-pointer"
+      onClick={handleRulerClick}
+      title="Click to seek to position"
+    >
       {/* Time markers */}
       {markers.map((marker) => (
         <div

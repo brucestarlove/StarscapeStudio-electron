@@ -39,6 +39,18 @@ export function snapToClips(value: number, clips: Array<{ startMs: number; endMs
   return value;
 }
 
+export function snapToTimeline(value: number, zoom: number, snapEnabled: boolean = true): number {
+  if (!snapEnabled) return value;
+  
+  // Determine snap interval based on zoom level
+  let snapIntervalMs = 1000; // 1 second default
+  if (zoom > 0.5) snapIntervalMs = 100; // 100ms for high zoom
+  else if (zoom > 0.1) snapIntervalMs = 500; // 500ms for medium zoom
+  else if (zoom < 0.05) snapIntervalMs = 5000; // 5 seconds for low zoom
+  
+  return snapToGrid(value, snapIntervalMs);
+}
+
 // File utility functions
 export function getFileExtension(filename: string): string {
   return filename.split('.').pop()?.toLowerCase() || '';
