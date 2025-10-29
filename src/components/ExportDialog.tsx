@@ -137,7 +137,7 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-xl min-w-[500px]">
         <DialogHeader>
           <DialogTitle className="text-h3 font-semibold gradient-text">
             Export Video
@@ -248,24 +248,28 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
 
           {/* Export Success */}
           {exportResult && exportResult.success && (
-            <div className="text-center space-y-md">
-              <CheckCircle className="h-12 w-12 text-green-400 mx-auto" />
+            <div className="text-center space-y-md py-4">
+              <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
               <div>
-                <p className="text-body text-white mb-sm">Export completed successfully!</p>
-                <p className="text-caption text-white/70 break-all">
-                  {exportResult.path}
-                </p>
+                <p className="text-h4 text-white mb-md font-semibold">Export completed successfully!</p>
+                <div className="bg-white/5 rounded-lg p-md border border-white/10">
+                  <p className="text-caption text-white/70 break-all text-left font-mono">
+                    {exportResult.path}
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
           {/* Export Error */}
           {error && (
-            <div className="text-center space-y-md">
-              <X className="h-12 w-12 text-red-400 mx-auto" />
+            <div className="text-center space-y-md py-4">
+              <X className="h-16 w-16 text-red-400 mx-auto" />
               <div>
-                <p className="text-body text-white mb-sm">Export failed</p>
-                <p className="text-caption text-red-400">{error}</p>
+                <p className="text-h4 text-white mb-md font-semibold">Export failed</p>
+                <div className="bg-red-500/10 rounded-lg p-md border border-red-500/30">
+                  <p className="text-caption text-red-400 break-words">{error}</p>
+                </div>
               </div>
             </div>
           )}

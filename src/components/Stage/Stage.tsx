@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { Play, Music } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
