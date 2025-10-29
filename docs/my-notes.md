@@ -16,5 +16,13 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 [x] smooth seeking - implemented with requestAnimationFrame, clickable ruler, draggable playhead
 [x] smooth clipping - fixed trim handle sensitivity with incremental delta tracking
 [x] export including clipped!
-[ ] fix export modal style
+[x] fix export modal style
+[x] fix import modal style
+[x] allow renaming of file on export
+[x] fix mismatch scroll in the timeline between track headers and the tracks
+[x] 2nd video track
+[ ] dragging
+[ ] import asset with the original name
+[ ] right click menu to rename asset
+[ ] right pane with edit features
 [ ] 
