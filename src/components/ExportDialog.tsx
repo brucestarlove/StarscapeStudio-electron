@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Download, X, CheckCircle } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
-import { exportProject, listenExportProgress, type ExportSettings, type ProgressEvent } from "@/lib/bindings";
+import { exportProject, listenExportProgress, revealInFinder, type ExportSettings, type ProgressEvent } from "@/lib/bindings";
 
 interface ExportDialogProps {
   open: boolean;
@@ -298,7 +298,33 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
               </>
             )}
             
-            {(exportResult || error) && (
+            {exportResult && exportResult.success && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleClose}
+                >
+                  Close
+                </Button>
+                <Button
+                  variant="gradient"
+                  onClick={async () => {
+                    try {
+                      // Remove file:// protocol if present
+                      const filePath = exportResult.path.replace(/^file:\/\//, '');
+                      await revealInFinder(filePath);
+                      handleClose();
+                    } catch (err) {
+                      console.error('Failed to reveal in finder:', err);
+                    }
+                  }}
+                >
+                  Open in Finder
+                </Button>
+              </>
+            )}
+            
+            {error && (
               <Button
                 variant="gradient"
                 onClick={handleClose}
