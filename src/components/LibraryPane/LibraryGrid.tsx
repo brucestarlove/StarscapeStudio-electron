@@ -99,10 +99,12 @@ function AssetCard({ asset, onDoubleClick, onAddToTimeline, onRename }: AssetCar
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/10 text-white/80 capitalize">
                 {asset.type}
               </span>
-              {/* Duration */}
-              <span className="text-[10px] text-white/50 font-mono">
-                {formatTimecode(asset.duration)}
-              </span>
+              {/* Duration - only show for non-image assets */}
+              {asset.type !== 'image' && (
+                <span className="text-[10px] text-white/50 font-mono">
+                  {formatTimecode(asset.duration)}
+                </span>
+              )}
             </div>
 
             {/* Resolution and file size */}
@@ -142,9 +144,10 @@ function AssetCard({ asset, onDoubleClick, onAddToTimeline, onRename }: AssetCar
 
 interface LibraryGridProps {
   onUploadClick: () => void;
+  onClearAll?: () => void;
 }
 
-export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
+export function LibraryGrid({ onUploadClick, onClearAll }: LibraryGridProps) {
   const { assets, createClip, clearProject } = useProjectStore();
   const { currentTimeMs } = usePlaybackStore();
   const { leftPaneCollapsed, setLeftPaneCollapsed } = useUiStore();
@@ -233,36 +236,13 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
   const handleClearAll = () => {
     if (window.confirm('Are you sure you want to clear all assets and reset the project? This cannot be undone.')) {
       clearProject();
+      onClearAll?.();
     }
   };
 
   return (
     <div className="h-full flex flex-col">
-      {/* Upload button */}
-      <div className="p-md space-y-sm">
-        <Button
-          variant="outline"
-          className="w-full h-20 flex flex-col items-center justify-center space-y-sm border-dashed border-2 border-light-blue/50 hover:border-light-blue hover:bg-light-blue/10"
-          onClick={handleUploadClick}
-        >
-          <Plus className="h-6 w-6 text-light-blue" />
-          <span className="text-light-blue font-medium">Upload Media</span>
-        </Button>
-
-        {assets.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-red-400 hover:text-red-300 hover:bg-red-500/10"
-            onClick={handleClearAll}
-          >
-            <Trash2 className="h-4 w-4 mr-xs" />
-            Clear All Assets
-          </Button>
-        )}
-      </div>
-
-      {/* Assets grid */}
+      {/* Assets grid with Upload button as first item */}
       <div className="flex-1 overflow-auto scrollbar-starscape p-md">
         {assets.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
@@ -274,6 +254,16 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-md">
+            {/* Upload Media button - same size as asset cards */}
+            <Button
+              variant="outline"
+              className="h-auto aspect-video flex flex-col items-center justify-center space-y-sm border-dashed border-2 border-light-blue/50 hover:border-light-blue hover:bg-light-blue/10"
+              onClick={handleUploadClick}
+            >
+              <Plus className="h-6 w-6 text-light-blue" />
+              <span className="text-light-blue font-medium">Upload Media</span>
+            </Button>
+
             {assets.map((asset) => (
               <AssetCard
                 key={asset.id}
