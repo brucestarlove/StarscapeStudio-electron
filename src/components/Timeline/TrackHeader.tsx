@@ -52,6 +52,12 @@ export function TrackHeader({ trackId }: TrackHeaderProps) {
         <span className="text-body text-white font-semibold truncate flex-1">
           {track.name}
         </span>
+        {/* Main Track Badge */}
+        {trackId === 'track-1' && (
+          <span className="px-2 py-0.5 text-caption font-bold bg-gradient-to-r from-light-blue to-cyan-500 text-white rounded-sm">
+            MAIN
+          </span>
+        )}
       </div>
 
       {/* Track controls */}

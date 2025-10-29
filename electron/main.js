@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog, protocol, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const squirrelStartup = require('electron-squirrel-startup');
@@ -171,37 +171,42 @@ async function initialize() {
   cacheDirs = new CacheDirs(app);
   await cacheDirs.ensureDirectories();
 
-  // Register custom protocol for serving local media files
-  protocol.registerFileProtocol('media', (request, callback) => {
-    try {
-      // Extract file path from media:// URL
-      let url = request.url.substring('media://'.length);
-      
-      // Add leading slash if missing (protocol strips it)
-      if (!url.startsWith('/')) {
-        url = '/' + url;
-      }
-      
-      // Decode URI component to handle spaces and special characters
-      const filePath = decodeURIComponent(url);
-      
-      console.log(`[media://] Request for: ${request.url}`);
-      console.log(`[media://] Decoded path: ${filePath}`);
-      
-      // Security check: ensure the file exists and is readable
-      if (!fs.existsSync(filePath)) {
-        console.error(`[media://] File not found: ${filePath}`);
-        callback({ error: -6 }); // NET::ERR_FILE_NOT_FOUND
-        return;
-      }
-      
-      console.log(`[media://] File exists, serving: ${filePath}`);
-      callback({ path: filePath });
-    } catch (error) {
-      console.error('[media://] Error serving media file:', error);
-      callback({ error: -2 }); // NET::ERR_FAILED
+  // Set up permission request handlers for media access
+  // This allows the app to request camera, microphone, and screen recording permissions
+  const ses = session.defaultSession;
+  
+  ses.setPermissionRequestHandler((webContents, permission, callback) => {
+    // Allow media permissions (camera, microphone) for webcam recording
+    if (permission === 'media' || permission === 'camera' || permission === 'microphone') {
+      callback(true);
+      return;
     }
+    
+    // Allow screen recording permission (triggered by desktopCapturer.getSources)
+    // Note: Screen recording permission is handled by macOS system dialog
+    // when desktopCapturer.getSources() is called, not through this handler
+    
+    // Deny other permissions by default
+    callback(false);
   });
+  
+  // Set up permission check handler (called before permission request)
+  ses.setPermissionCheckHandler((webContents, permission, requestingOrigin) => {
+    // For local files (file:// protocol) or localhost, allow media permissions
+    if (requestingOrigin === 'file://' || requestingOrigin.startsWith('http://localhost') || requestingOrigin.startsWith('http://127.0.0.1')) {
+      if (permission === 'media' || permission === 'camera' || permission === 'microphone') {
+        return true;
+      }
+    }
+    
+    // Screen recording permission is always handled by macOS system dialog
+    // This handler is mainly for web-based media access
+    return false;
+  });
+
+  // Custom protocol registration removed - using file:// protocol directly
+  // This simplifies the codebase and follows professional video editor patterns
+  // where absolute file paths are stored and file:// is added only when loading media
 
   // Create window
   createWindow();
@@ -465,6 +470,204 @@ ipcMain.handle('stop-screen-record', async (event, recordingId) => {
 });
 
 /**
+ * List available video and audio devices for webcam recording
+ */
+ipcMain.handle('list-webcam-devices', async () => {
+  try {
+    const { spawn } = require('child_process');
+    const ffmpegPath = require('./ffmpeg').resolveFfmpegPath();
+    
+    return new Promise((resolve, reject) => {
+      const devices = {
+        video: [],
+        audio: []
+      };
+      
+      // Use FFmpeg to list avfoundation devices on macOS
+      const ffmpegProcess = spawn(ffmpegPath, [
+        '-f', 'avfoundation',
+        '-list_devices', 'true',
+        '-i', ''
+      ]);
+      
+      let stderrOutput = '';
+      
+      ffmpegProcess.stderr.on('data', (data) => {
+        stderrOutput += data.toString();
+      });
+      
+      ffmpegProcess.on('close', (code) => {
+        // Parse the output to extract device information
+        const lines = stderrOutput.split('\n');
+        let inVideoSection = false;
+        let inAudioSection = false;
+        
+        for (const line of lines) {
+          if (line.includes('AVFoundation video devices:')) {
+            inVideoSection = true;
+            inAudioSection = false;
+            continue;
+          }
+          if (line.includes('AVFoundation audio devices:')) {
+            inVideoSection = false;
+            inAudioSection = true;
+            continue;
+          }
+          
+          // Match device lines like "[0] FaceTime HD Camera"
+          const match = line.match(/\[(\d+)\]\s+(.+)/);
+          if (match) {
+            const index = parseInt(match[1]);
+            const name = match[2].trim();
+            
+            if (inVideoSection) {
+              devices.video.push({ index, name });
+            } else if (inAudioSection) {
+              devices.audio.push({ index, name });
+            }
+          }
+        }
+        
+        resolve(devices);
+      });
+      
+      ffmpegProcess.on('error', (error) => {
+        reject(new Error(`Failed to list devices: ${error.message}`));
+      });
+    });
+  } catch (error) {
+    throw new Error(`Failed to list webcam devices: ${error.message}`);
+  }
+});
+
+/**
+ * Start webcam recording using FFmpeg
+ */
+ipcMain.handle('start-webcam-record', async (event, settings) => {
+  try {
+    const { fps = 30, includeAudio = true, videoDeviceIndex = 0, audioDeviceIndex = 0 } = settings;
+    const ffmpeg = require('fluent-ffmpeg');
+    const { resolveFfmpegPath } = require('./ffmpeg');
+    
+    const recordingId = `webcam_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Generate output path - use MP4 for better compatibility
+    const outputPath = path.join(
+      cacheDirs ? cacheDirs.captures : app.getPath('temp'),
+      `webcam_recording_${recordingId}.mp4`
+    );
+    
+    // Build FFmpeg command for avfoundation input on macOS
+    // Format: "video_index:audio_index" where -1 means no audio
+    const inputIndex = includeAudio ? `${videoDeviceIndex}:${audioDeviceIndex}` : `${videoDeviceIndex}:-1`;
+    
+    // Set FFmpeg path first (before creating command)
+    const ffmpegPath = resolveFfmpegPath();
+    ffmpeg.setFfmpegPath(ffmpegPath);
+    
+    // Use fluent-ffmpeg with explicit format specification
+    // For avfoundation, we need to use inputFormat() method
+    const command = ffmpeg()
+      .input(inputIndex)
+      .inputFormat('avfoundation')
+      .inputOptions([
+        '-framerate', String(fps),
+        '-video_size', '1280x720'
+      ])
+      .output(outputPath)
+      .videoCodec('libx264')
+      .videoBitrate('2500k')
+      .outputOptions([
+        '-preset', 'fast',
+        '-crf', '23',
+        '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart'
+      ]);
+    
+    if (includeAudio) {
+      command.audioCodec('aac')
+        .audioBitrate('128k')
+        .audioChannels(2)
+        .audioFrequency(44100);
+    }
+    
+    // Start the recording process
+    const ffmpegProcess = command.on('start', (commandLine) => {
+      console.log(`FFmpeg command: ${commandLine}`);
+    })
+    .on('error', (err) => {
+      console.error(`Webcam recording error: ${err.message}`);
+      // Don't delete immediately - wait a bit in case it's a recoverable error
+      setTimeout(() => {
+        activeRecordings.delete(recordingId);
+      }, 1000);
+    })
+    .on('end', () => {
+      console.log(`Webcam recording completed: ${outputPath}`);
+      activeRecordings.delete(recordingId);
+    })
+    .run();
+    
+    // Track the process for cleanup
+    trackProcess(ffmpegProcess);
+    
+    // Store recording info
+    activeRecordings.set(recordingId, {
+      type: 'webcam',
+      outputPath,
+      startTime: Date.now(),
+      settings: { fps, includeAudio, videoDeviceIndex, audioDeviceIndex },
+      process: ffmpegProcess
+    });
+    
+    console.log(`Started webcam recording ${recordingId} to ${outputPath}`);
+    
+    return {
+      recordingId,
+      outPath: outputPath
+    };
+  } catch (error) {
+    throw new Error(`Failed to start webcam recording: ${error.message}`);
+  }
+});
+
+/**
+ * Stop webcam recording
+ */
+ipcMain.handle('stop-webcam-record', async (event, recordingId) => {
+  try {
+    const recording = activeRecordings.get(recordingId);
+    if (!recording) {
+      throw new Error(`Recording ${recordingId} not found`);
+    }
+    
+    // Stop the FFmpeg process
+    if (recording.process && !recording.process.killed) {
+      // Send SIGTERM to gracefully stop FFmpeg
+      recording.process.kill('SIGTERM');
+      
+      // Wait a bit for graceful shutdown, then force kill if needed
+      setTimeout(() => {
+        if (!recording.process.killed) {
+          recording.process.kill('SIGKILL');
+        }
+      }, 2000);
+    }
+    
+    // Remove from active recordings after a delay to ensure file is written
+    setTimeout(() => {
+      activeRecordings.delete(recordingId);
+    }, 1000);
+    
+    console.log(`Stopped webcam recording ${recordingId}`);
+    
+    return recording.outputPath;
+  } catch (error) {
+    throw new Error(`Failed to stop webcam recording: ${error.message}`);
+  }
+});
+
+/**
  * Get media metadata
  */
 ipcMain.handle('get-media-metadata', async (event, filePath) => {
@@ -565,19 +768,36 @@ ipcMain.handle('save-blob-to-file', async (event, blobData, filePath) => {
     const fs = require('fs');
     const buffer = Buffer.from(blobData);
     
+    // Validate buffer has content
+    if (buffer.length === 0) {
+      throw new Error('Cannot save empty blob. Recording may have failed or been too short.');
+    }
+    
     // Save the blob to the original file path (WebM)
     await fs.promises.writeFile(filePath, buffer);
-    console.log(`Saved WebM recording to: ${filePath}`);
+    console.log(`Saved WebM recording to: ${filePath} (${buffer.length} bytes)`);
+    
+    // Validate file was written correctly
+    const stats = await fs.promises.stat(filePath);
+    if (stats.size === 0) {
+      throw new Error('Saved file is empty. Disk may be full or permissions issue.');
+    }
     
     // Convert WebM to MP4 for better compatibility
     const mp4Path = filePath.replace('.webm', '.mp4');
-    await convertWebmToMp4(filePath, mp4Path);
     
-    // Delete the original WebM file
-    await fs.promises.unlink(filePath);
-    console.log(`Deleted temporary WebM file: ${filePath}`);
-    
-    return { success: true, path: mp4Path };
+    try {
+      await convertWebmToMp4(filePath, mp4Path);
+      // Delete the original WebM file
+      await fs.promises.unlink(filePath);
+      console.log(`Deleted temporary WebM file: ${filePath}`);
+      return { success: true, path: mp4Path };
+    } catch (conversionError) {
+      // If conversion fails, keep the WebM file and return it
+      console.error(`WebM to MP4 conversion failed: ${conversionError.message}`);
+      console.log(`Keeping WebM file: ${filePath}`);
+      return { success: true, path: filePath, conversionFailed: true };
+    }
   } catch (error) {
     throw new Error(`Failed to save blob to file: ${error.message}`);
   }

@@ -9,7 +9,7 @@ function buildPlan(projectJsonString) {
     throw new Error(`Invalid project JSON: ${e.message}`);
   }
 
-  const { id, assets = {}, clips = {}, tracks = {} } = parsed;
+  const { id, assets = {}, clips = {}, tracks = {}, canvasNodes = {} } = parsed;
 
   if (!id) {
     throw new Error('Project JSON missing id field');
@@ -48,12 +48,30 @@ function buildPlan(projectJsonString) {
         outMs: clip.outMs,
         startMs: clip.startMs,
         endMs: clip.endMs,
+        clipId: clipId,
       };
 
-      // All clips go to mainTrack for now (we'll handle overlays later)
+      // For overlay tracks, attach transform data from canvasNodes
+      if (track.role === 'overlay' && track.type === 'video') {
+        // Find the canvas node for this clip
+        const canvasNode = Object.values(canvasNodes).find(node => node.clipId === clipId);
+        if (canvasNode) {
+          seqClip.transform = {
+            x: canvasNode.x,
+            y: canvasNode.y,
+            width: canvasNode.width,
+            height: canvasNode.height,
+            rotation: canvasNode.rotation,
+            opacity: canvasNode.opacity,
+          };
+        }
+      }
+
+      // Separate main track from overlay track
       if (track.role === 'main') {
         mainTrack.push(seqClip);
-      } else {
+      } else if (track.type === 'video') {
+        // Only video overlays (not audio)
         overlayTrack.push(seqClip);
       }
     }
@@ -61,10 +79,9 @@ function buildPlan(projectJsonString) {
 
   // Sort main track by start time
   mainTrack.sort((a, b) => a.startMs - b.startMs);
-
-  // For overlapping clips (clips on different tracks at same time),
-  // we'll just include all of them for now and let the export handle compositing
-  // In the future, we can add proper multi-track compositing logic here
+  
+  // Sort overlay track by start time
+  overlayTrack.sort((a, b) => a.startMs - b.startMs);
 
   return {
     id,

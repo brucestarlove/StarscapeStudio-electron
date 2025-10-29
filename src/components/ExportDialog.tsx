@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, X, CheckCircle } from "lucide-react";
+import { Download, X, CheckCircle, AlertCircle } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { exportProject, listenExportProgress, revealInFinder, type ExportSettings, type ProgressEvent } from "@/lib/bindings";
 
@@ -12,7 +12,7 @@ interface ExportDialogProps {
 }
 
 export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
-  const { id, projectName, assets, tracks, clips } = useProjectStore();
+  const { id, projectName, assets, tracks, clips, canvasNodes } = useProjectStore();
   
   // Export settings state
   const [settings, setSettings] = useState<ExportSettings>({
@@ -28,33 +28,47 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [exportResult, setExportResult] = useState<{ path: string; success: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   
   // Filename state - initialize with cleaned project name
   const [filename, setFilename] = useState<string>(
     `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_export`
   );
 
+  // Check if there are any video clips on the timeline
+  const hasVisualClips = (): boolean => {
+    for (const track of tracks) {
+      // Only check video tracks
+      if (track.type === 'video' && track.clips.length > 0) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const handleExport = async () => {
+    // Validate that there are visual clips
+    if (!hasVisualClips()) {
+      setValidationError("No visual clips found on the timeline. Please add clips to video tracks before exporting.");
+      return;
+    }
+
     try {
       setIsExporting(true);
       setError(null);
       setProgress(null);
       setExportResult(null);
+      setValidationError(null);
 
       // Transform project state to backend format
       // Backend expects: { id, assets: {}, clips: {}, tracks: {} }
       // where tracks have clipOrder and role fields
       const backendAssets: Record<string, any> = {};
       assets.forEach(asset => {
-        // Convert media:// URL to file path
-        let srcPath = asset.url;
-        if (srcPath.startsWith('media://')) {
-          srcPath = srcPath.replace('media://', '');
-        }
-        
+        // Use absolute file path directly (no protocol conversion needed)
         backendAssets[asset.id] = {
           id: asset.id,
-          src: srcPath,
+          src: asset.url,
           duration_ms: asset.duration,
           width: asset.metadata.width,
           height: asset.metadata.height,
@@ -75,9 +89,13 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
       
       const backendTracks: Record<string, any> = {};
       tracks.forEach((track, index) => {
-        // All video tracks are treated as 'main' for export
-        // Audio tracks can be 'overlay' (they'll be mixed together)
-        const role = track.type === 'video' ? 'main' : 'overlay';
+        // Track 1 (index 0) is 'main' for full-screen rendering
+        // Track 2+ video tracks are 'overlay' for PiP rendering
+        // Audio tracks are 'overlay' (they'll be mixed together)
+        let role = 'overlay';
+        if (track.type === 'video' && index === 0) {
+          role = 'main';
+        }
         
         backendTracks[track.id] = {
           id: track.id,
@@ -88,6 +106,21 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
         };
       });
 
+      // Prepare canvasNodes for backend
+      const backendCanvasNodes: Record<string, any> = {};
+      Object.entries(canvasNodes).forEach(([nodeId, node]) => {
+        backendCanvasNodes[nodeId] = {
+          id: node.id,
+          clipId: node.clipId,
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+          rotation: node.rotation,
+          opacity: node.opacity,
+        };
+      });
+
       // Create project JSON in backend format
       const projectJson = JSON.stringify({
         id,
@@ -95,6 +128,7 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
         assets: backendAssets,
         clips: backendClips,
         tracks: backendTracks,
+        canvasNodes: backendCanvasNodes,
       });
 
       // Set up progress listener
@@ -121,6 +155,7 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
       setProgress(null);
       setExportResult(null);
       setError(null);
+      setValidationError(null);
     }
   };
 
@@ -151,8 +186,21 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
         </DialogHeader>
 
         <div className="space-y-lg">
+          {/* Validation Error */}
+          {validationError && (
+            <div className="text-center space-y-md py-4">
+              <AlertCircle className="h-16 w-16 text-yellow-400 mx-auto" />
+              <div>
+                <p className="text-h4 text-white mb-md font-semibold">Cannot export</p>
+                <div className="bg-yellow-500/10 rounded-lg p-md border border-yellow-500/30">
+                  <p className="text-caption text-yellow-400 break-words">{validationError}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Export Settings */}
-          {!isExporting && !exportResult && (
+          {!isExporting && !exportResult && !validationError && (
             <>
               {/* Format */}
               <div className="space-y-sm">
@@ -326,6 +374,15 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
             )}
             
             {error && (
+              <Button
+                variant="gradient"
+                onClick={handleClose}
+              >
+                Close
+              </Button>
+            )}
+
+            {validationError && (
               <Button
                 variant="gradient"
                 onClick={handleClose}

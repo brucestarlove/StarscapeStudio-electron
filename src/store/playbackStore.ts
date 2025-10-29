@@ -14,17 +14,11 @@ interface PlaybackStore extends PlaybackState {
   zoomOut: () => void;
   toggleSnap: () => void;
   
-  // Frame navigation
-  stepForward: () => void;
-  stepBackward: () => void;
-  
   // Playback control
   stop: () => void;
   goToStart: () => void;
-  goToEnd: () => void;
   
   // Audio control
-  setVolume: (volume: number) => void;
   toggleMute: () => void;
 }
 
@@ -78,19 +72,6 @@ export const usePlaybackStore = create<PlaybackStore>()((set) => ({
     set((state) => ({ snapEnabled: !state.snapEnabled }));
   },
   
-  // Frame navigation
-  stepForward: () => {
-    set((state) => ({ 
-      currentTimeMs: state.currentTimeMs + (1000 / 30) // ~33ms for 30fps
-    }));
-  },
-  
-  stepBackward: () => {
-    set((state) => ({ 
-      currentTimeMs: Math.max(0, state.currentTimeMs - (1000 / 30))
-    }));
-  },
-  
   // Playback control
   stop: () => {
     set({ playing: false, currentTimeMs: 0 });
@@ -98,17 +79,6 @@ export const usePlaybackStore = create<PlaybackStore>()((set) => ({
   
   goToStart: () => {
     set({ currentTimeMs: 0 });
-  },
-  
-  goToEnd: () => {
-    // This would need to be calculated from the project store
-    // For now, we'll use a placeholder
-    set({ currentTimeMs: 60000 }); // 1 minute placeholder
-  },
-  
-  // Audio control - update volume with validation
-  setVolume: (volume: number) => {
-    set({ volume: Math.max(0, Math.min(1, volume)) });
   },
   
   // Toggle mute state

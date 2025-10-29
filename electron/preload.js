@@ -32,6 +32,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startScreenRecord: (settings) => ipcRenderer.invoke('start-screen-record', settings),
   stopScreenRecord: (recordingId) => ipcRenderer.invoke('stop-screen-record', recordingId),
   
+  // Webcam recording
+  startWebcamRecord: (settings) => ipcRenderer.invoke('start-webcam-record', settings),
+  stopWebcamRecord: (recordingId) => ipcRenderer.invoke('stop-webcam-record', recordingId),
+  listWebcamDevices: () => ipcRenderer.invoke('list-webcam-devices'),
+  
   // Progress events
   onExportProgress: (callback) => {
     const listener = (event, data) => callback(data);
@@ -61,6 +66,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Return cleanup function
     return () => {
       ipcRenderer.removeListener('stop-recording', listener);
+    };
+  },
+  
+  // Webcam recording events
+  onStartWebcamRecording: (callback) => {
+    const listener = (event, data) => callback(data);
+    ipcRenderer.on('start-webcam-recording', listener);
+    
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener('start-webcam-recording', listener);
+    };
+  },
+  
+  onStopWebcamRecording: (callback) => {
+    const listener = (event, data) => callback(data);
+    ipcRenderer.on('stop-webcam-recording', listener);
+    
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener('stop-webcam-recording', listener);
     };
   },
 });

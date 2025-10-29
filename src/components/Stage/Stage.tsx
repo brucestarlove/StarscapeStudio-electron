@@ -1,23 +1,27 @@
 import { Play } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { audioManager } from "@/lib/AudioManager";
 import { videoPoolManager } from "@/lib/VideoPoolManager";
 import { CanvasCompositor } from "@/lib/CanvasCompositor";
+import { TransformControls } from "./TransformControls";
 import type { Clip, Asset, Track } from "@/types";
 
 export function Stage() {
-  const { clips, getAssetById, tracks, assets, getTimelineDuration } = useProjectStore();
-  const { currentTimeMs, playing, seek, pause } = usePlaybackStore();
-  const timelineDuration = getTimelineDuration();
+  const { clips, getAssetById, tracks, assets, getTimelineDuration, canvasNodes } = useProjectStore();
+  const { currentTimeMs, playing } = usePlaybackStore();
 
   // Canvas and compositor refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const compositorRef = useRef<CanvasCompositor | null>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Track canvas display dimensions for transform controls
+  const [canvasDisplaySize, setCanvasDisplaySize] = useState({ width: 0, height: 0 });
 
   // Get ALL visible clips at current time (video, audio, image)
-  const visibleClips = getAllVisibleClips(clips, tracks, getAssetById, currentTimeMs);
+  const visibleClips = getAllVisibleClips(clips, tracks, getAssetById, currentTimeMs, canvasNodes);
   
   // Separate clips by type for rendering
   const videoAndImageClips = visibleClips.filter(
@@ -129,7 +133,8 @@ export function Stage() {
       // Debug logging every 500ms
       if (currentFrameTime - lastLogTime > 500) {
         const timeFormatted = (newTimeMs / 1000).toFixed(2);
-        const activeClips = getAllVisibleClips(clips, tracks, getAssetById, newTimeMs);
+        const { canvasNodes } = useProjectStore.getState();
+        const activeClips = getAllVisibleClips(clips, tracks, getAssetById, newTimeMs, canvasNodes);
         console.log(`⏱️  Playing: ${timeFormatted}s | Active clips: ${activeClips.length}`);
         lastLogTime = currentFrameTime;
       }
@@ -171,6 +176,29 @@ export function Stage() {
     }
   }, [playing]);
 
+  // Track canvas display size for transform controls
+  useEffect(() => {
+    if (!canvasContainerRef.current) return;
+    
+    const updateSize = () => {
+      if (canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        setCanvasDisplaySize({ width: rect.width, height: rect.height });
+      }
+    };
+    
+    // Initial size
+    updateSize();
+    
+    // Watch for resize
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(canvasContainerRef.current);
+    
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
   return (
     <div className="h-full bg-dark-navy p-md">
       <div className="h-full flex flex-col">
@@ -188,13 +216,23 @@ export function Stage() {
           <div className="absolute inset-0 flex items-center justify-center p-md">
             <div className="relative w-full h-full max-h-full flex items-center justify-center">
               {/* Canvas for video/image compositing */}
-              <div className="relative aspect-video bg-black w-full h-full max-w-full max-h-full">
+              <div ref={canvasContainerRef} className="relative aspect-video bg-black w-full h-full max-w-full max-h-full">
                 <canvas
                   ref={canvasRef}
                   width={1920}
                   height={1080}
                   className="w-full h-full object-contain"
                 />
+
+                {/* Transform controls overlay for PiP clips */}
+                {canvasDisplaySize.width > 0 && (
+                  <TransformControls
+                    canvasWidth={1920}
+                    canvasHeight={1080}
+                    displayWidth={canvasDisplaySize.width}
+                    displayHeight={canvasDisplaySize.height}
+                  />
+                )}
 
                 {/* Empty state */}
                 {videoAndImageClips.length === 0 && (
@@ -221,6 +259,7 @@ interface ClipWithMetadata {
   asset: Asset;
   track: Track;
   trackIndex: number;
+  canvasNode: any; // CanvasNode type
 }
 
 // Helper function to get ALL visible clips at current time (video, audio, image)
@@ -229,7 +268,8 @@ function getAllVisibleClips(
   clips: Record<string, Clip>, 
   tracks: Track[], 
   getAssetById: (id: string) => Asset | undefined,
-  currentTimeMs: number
+  currentTimeMs: number,
+  canvasNodes: Record<string, any> // CanvasNodes
 ): ClipWithMetadata[] {
   const visibleClips: ClipWithMetadata[] = [];
   
@@ -245,12 +285,16 @@ function getAllVisibleClips(
       // Check if current time falls within clip bounds
       if (currentTimeMs >= clip.startMs && currentTimeMs < clip.endMs) {
         const asset = getAssetById(clip.assetId);
-        if (asset) {
+        // Find the corresponding canvas node for this clip
+        const canvasNode = Object.values(canvasNodes).find(node => node.clipId === clipId);
+        
+        if (asset && canvasNode) {
           visibleClips.push({
             clip,
             asset,
             track,
             trackIndex,
+            canvasNode,
           });
         }
       }

@@ -63,7 +63,13 @@ export class AudioManager {
 
     // Create new audio element
     const audio = document.createElement('audio');
-    audio.src = asset.url;
+    
+    // Add file:// protocol if not present (required for Electron)
+    const audioSrc = asset.url.startsWith('file://') 
+      ? asset.url 
+      : `file://${asset.url}`;
+    
+    audio.src = audioSrc;
     audio.preload = 'auto';
     audio.volume = this.masterVolume;
     audio.muted = this.isMuted;

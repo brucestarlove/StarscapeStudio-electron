@@ -21,7 +21,12 @@
   "mac": {
     "category": "public.app-category.video",
     "target": ["dmg"],
-    "icon": "build-resources/icons/icon.icns"
+    "icon": "build-resources/icons/icon.icns",
+    "extendInfo": {
+      "NSScreenRecordingUsageDescription": "This app needs access to screen recording to capture video content for editing.",
+      "NSCameraUsageDescription": "This app needs access to your camera to record video content.",
+      "NSMicrophoneUsageDescription": "This app needs access to your microphone to record audio with video."
+    }
   }
 }
 

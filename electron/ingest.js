@@ -65,7 +65,8 @@ function getAssetType(filePath) {
 }
 
 /**
- * Ingest files from external paths into cache directory
+ * Ingest files - reference them directly without copying
+ * This allows the renderer to access files in their original location
  */
 async function ingestFiles(filePaths, cache) {
   const results = [];
@@ -89,36 +90,20 @@ async function ingestFiles(filePaths, cache) {
 
       // Generate unique asset ID
       const assetId = generateAssetId();
-      const ext = path.extname(filePath).substring(1); // Remove leading dot
-      const cachedFilename = `${assetId}.${ext}`;
-      const cachedPath = path.join(cache.mediaDir, cachedFilename);
 
       console.log(`Ingesting file: ${filePath}`);
       console.log(`Original name: ${originalFileName}`);
-      console.log(`Target cache path: ${cachedPath}`);
 
-      // Ensure cache directory exists
-      await fs.ensureDir(cache.mediaDir);
+      // Ensure cache directory exists (for thumbnails)
       await fs.ensureDir(cache.thumbDir);
 
-      // Copy file to cache directory
-      await fs.copy(filePath, cachedPath);
-      console.log(`File copied successfully to: ${cachedPath}`);
+      // Get file size from original location
+      const fileSize = stats.size;
 
-      // Verify the copied file exists
-      const copiedExists = await fs.pathExists(cachedPath);
-      if (!copiedExists) {
-        throw new Error(`Failed to copy file to cache: ${cachedPath}`);
-      }
+      // Extract metadata from original file
+      const metadata = await probeMedia(filePath);
 
-      // Get file size
-      const fileStats = await fs.stat(cachedPath);
-      const fileSize = fileStats.size;
-
-      // Extract metadata
-      const metadata = await probeMedia(cachedPath);
-
-      // Generate thumbnail
+      // Generate thumbnail (stored in cache, but media stays in original location)
       let thumbnailPath = null;
       const assetType = getAssetType(filePath);
       
@@ -126,12 +111,12 @@ async function ingestFiles(filePaths, cache) {
         if (assetType === 'video') {
           const thumbnailFilename = `${assetId}.jpg`;
           thumbnailPath = path.join(cache.thumbDir, thumbnailFilename);
-          await generateVideoThumbnail(cachedPath, thumbnailPath);
+          await generateVideoThumbnail(filePath, thumbnailPath);
           console.log(`Thumbnail generated: ${thumbnailPath}`);
         } else if (assetType === 'image') {
           const thumbnailFilename = `${assetId}.jpg`;
           thumbnailPath = path.join(cache.thumbDir, thumbnailFilename);
-          await generateImageThumbnail(cachedPath, thumbnailPath);
+          await generateImageThumbnail(filePath, thumbnailPath);
           console.log(`Thumbnail generated: ${thumbnailPath}`);
         }
       } catch (thumbError) {
@@ -141,7 +126,7 @@ async function ingestFiles(filePaths, cache) {
 
       results.push({
         asset_id: assetId,
-        file_path: cachedPath,
+        file_path: filePath, // Use original file path directly
         original_file_name: originalFileName,
         thumbnail_path: thumbnailPath,
         file_size: fileSize,

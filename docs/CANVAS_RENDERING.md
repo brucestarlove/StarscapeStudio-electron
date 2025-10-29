@@ -2,113 +2,77 @@
 
 ## Overview
 
-Starscape ClipForge now uses a sophisticated HTML5 Canvas-based rendering system for video playback and composition. This provides frame-accurate control, multi-layer composition, and advanced effects processing.
+Starscape ClipForge uses an HTML5 Canvas-based rendering system for video playback and composition. This provides frame-accurate control, multi-layer composition, and transform support for Picture-in-Picture overlays.
 
 ## Architecture
 
 ### Core Components
 
-1. **CanvasVideoRenderer** (`src/lib/CanvasVideoRenderer.ts`)
-   - Main rendering engine
-   - Frame-accurate video playback
-   - Multi-layer composition
+1. **CanvasCompositor** (`src/lib/CanvasCompositor.ts`)
+   - Main rendering engine for composition
+   - Multi-layer video/image rendering
+   - Transform support (position, scale, rotation, opacity)
    - RequestAnimationFrame-based rendering loop
-   - Asset preloading and caching
+   - Efficient image and video caching
 
-2. **CanvasEffects** (`src/lib/CanvasEffects.ts`)
-   - Blend modes (multiply, screen, overlay, etc.)
-   - Color adjustments (brightness, contrast, saturation, hue)
-   - Filter effects (blur, sharpen, grayscale, sepia)
-   - Transitions (fade, wipe, dissolve, slide)
-   - Overlays (gradients, vignettes, text)
+2. **VideoPoolManager** (`src/lib/VideoPoolManager.ts`)
+   - Video element pooling and management
+   - Pre-loads and caches video elements
+   - Manages playback state synchronization
 
-3. **CanvasOptimizations** (`src/lib/CanvasOptimizations.ts`)
-   - Offscreen canvas support
-   - WebGL-accelerated rendering
-   - Frame buffer caching
-   - Texture pooling
-   - Performance monitoring
+3. **AudioManager** (`src/lib/AudioManager.ts`)
+   - Audio synchronization with video playback
+   - Multi-clip audio mixing
+   - Volume and mute control
 
 4. **Stage Component** (`src/components/Stage/Stage.tsx`)
-   - React component wrapper
+   - React component wrapper for the canvas
    - Integration with Zustand stores
    - Playback loop management
    - Canvas lifecycle management
 
+5. **TransformControls** (`src/components/Stage/TransformControls.tsx`)
+   - Interactive PiP transform UI
+   - Drag, resize, and rotate handles
+   - Real-time canvas updates
+
 ## Key Features
 
-### 1. Frame-Accurate Rendering
+### 1. Multi-Layer Composition
 
-```typescript
-// Render a specific frame at exact time
-await renderer.renderFrame({
-  timeMs: 1500,
-  layers: [
-    {
-      asset: videoAsset,
-      clip: videoClip,
-      sourceTimeMs: 500, // Accounting for trim
-      canvasNode: transformData
-    }
-  ]
-});
-```
+Layers are rendered from bottom to top based on track position:
+- Track 1 (Main): Full-screen content
+- Track 2+ (PiP): Overlay content with transforms
 
-### 2. Multi-Layer Composition
+### 2. Transform Support
 
-Layers are rendered from bottom to top based on `zIndex`:
-
-```typescript
-const layers = [
-  { asset: backgroundVideo, clip: bgClip, zIndex: 0 },
-  { asset: overlayImage, clip: imgClip, zIndex: 1 },
-  { asset: titleVideo, clip: titleClip, zIndex: 2 }
-];
-```
-
-### 3. Transform Support
-
-Canvas nodes support:
-- Translation (x, y)
+Canvas nodes support for Picture-in-Picture:
+- Translation (x, y position)
 - Rotation (degrees)
 - Scaling (width, height)
 - Opacity (0-1)
 
-```typescript
-canvasNode = {
-  x: 100,        // Offset from center
-  y: -50,
-  width: 1920,
-  height: 1080,
-  rotation: 15,  // Degrees
-  opacity: 0.8
-};
-```
+### 3. Professional File Path Handling
 
-### 4. Trim and Seek
-
-Accurate source time calculation:
-```typescript
-const sourceTimeMs = (currentTimeMs - clip.startMs) + clip.trimStartMs;
-```
+Uses standard absolute file paths with `file://` protocol, following the pattern of professional video editors (Adobe Premiere, DaVinci Resolve, Final Cut Pro)
 
 ## Usage
 
 ### Basic Setup
 
 ```typescript
-import { CanvasVideoRenderer } from '@/lib/CanvasVideoRenderer';
+import { CanvasCompositor } from '@/lib/CanvasCompositor';
 
-// Create renderer
+// Create compositor
 const canvas = document.getElementById('myCanvas');
-const renderer = new CanvasVideoRenderer(canvas, { fps: 30 });
+const compositor = new CanvasCompositor(canvas, { fps: 30 });
 
 // Load assets
-await renderer.loadVideo(videoAsset);
-await renderer.loadImage(imageAsset);
+await compositor.loadVideo(videoAsset);
+await compositor.loadImage(imageAsset);
 
 // Render frame
-await renderer.renderFrame({
+await compositor.renderFrame({
   timeMs: 1000,
   layers: [...]
 });
@@ -118,16 +82,16 @@ await renderer.renderFrame({
 
 ```typescript
 // Start playback
-renderer.play((timeMs) => {
+compositor.play((timeMs) => {
   console.log('Current time:', timeMs);
   updateUITimecode(timeMs);
 });
 
 // Pause
-renderer.pause();
+compositor.pause();
 
 // Seek
-renderer.seek(5000); // 5 seconds
+compositor.seek(5000); // 5 seconds
 ```
 
 ### Applying Effects
@@ -302,14 +266,14 @@ const canvas = document.createElement('canvas');
 canvas.width = 1920;
 canvas.height = 1080;
 
-const renderer = new CanvasVideoRenderer(canvas);
+const compositor = new CanvasCompositor(canvas);
 
 // Load video
 const asset = await getAssetById('video_123');
-await renderer.loadVideo(asset);
+await compositor.loadVideo(asset);
 
 // Render at 5 seconds
-await renderer.renderFrame({
+await compositor.renderFrame({
   timeMs: 5000,
   layers: [{
     asset,
@@ -323,7 +287,7 @@ await renderer.renderFrame({
 
 ```typescript
 // Background video
-await renderer.renderLayer({
+await compositor.renderLayer({
   asset: backgroundVideo,
   clip: bgClip,
   sourceTimeMs: currentTime,
@@ -331,7 +295,7 @@ await renderer.renderLayer({
 });
 
 // Overlay image (picture-in-picture)
-await renderer.renderLayer({
+await compositor.renderLayer({
   asset: overlayImage,
   clip: overlayClip,
   sourceTimeMs: 0,

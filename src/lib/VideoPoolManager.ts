@@ -27,8 +27,19 @@ export class VideoPoolManager {
     const loadPromise = new Promise<void>((resolve, reject) => {
       const video = document.createElement('video');
       
+      // Add file:// protocol if not present (required for Electron)
+      const videoSrc = asset.url.startsWith('file://') 
+        ? asset.url 
+        : `file://${asset.url}`;
+      
+      console.log(`🎬 Loading video: ${asset.name}`, {
+        assetId: asset.id,
+        assetUrl: asset.url,
+        videoSrc: videoSrc
+      });
+      
       // Configure video element for pool
-      video.src = asset.url;
+      video.src = videoSrc;
       video.preload = 'auto';
       video.playsInline = true;
       video.muted = false; // Will be controlled by AudioManager

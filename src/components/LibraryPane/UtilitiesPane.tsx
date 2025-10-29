@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { startScreenRecord, stopScreenRecord, listenStartRecording, listenStopRecording, saveBlobToFile, revealInFinder } from "@/lib/bindings";
+import { startScreenRecord, stopScreenRecord, listenStartRecording, listenStopRecording, startWebcamRecord, stopWebcamRecord, saveBlobToFile, revealInFinder, listWebcamDevices, type WebcamDevices } from "@/lib/bindings";
 import { useUiStore } from "@/store/uiStore";
 import { useProjectStore } from "@/store/projectStore";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle, ChevronLeft } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { CheckCircle, ChevronLeft, Video, Mic } from "lucide-react";
 
 export function UtilitiesPane() {
   const { setLeftPaneCollapsed, setActiveLeftPaneTab } = useUiStore();
@@ -13,6 +13,14 @@ export function UtilitiesPane() {
   const [recordingId, setRecordingId] = useState<string>("");
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
+  
+  // Webcam recording state (simplified - FFmpeg handles everything in backend)
+  const [webcamRecordingId, setWebcamRecordingId] = useState<string>("");
+  const [webcamDevices, setWebcamDevices] = useState<WebcamDevices | null>(null);
+  const [showDeviceDialog, setShowDeviceDialog] = useState(false);
+  const [selectedVideoDevice, setSelectedVideoDevice] = useState<number>(0);
+  const [selectedAudioDevice, setSelectedAudioDevice] = useState<number>(0);
+  
   const [logs, setLogs] = useState<string>("");
   
   // Success modal state
@@ -120,6 +128,11 @@ export function UtilitiesPane() {
   const handleRecordToggle = async () => {
     try {
       if (!recordingId) {
+        // Prevent starting if webcam recording is active
+        if (webcamRecordingId) {
+          append({ error: 'Cannot start screen recording while webcam recording is active' });
+          return;
+        }
         const { recordingId: id, outPath } = await startScreenRecord({ 
           fps: 30, 
           display_index: 0,
@@ -134,6 +147,71 @@ export function UtilitiesPane() {
       }
     } catch (e) {
       append({ error: String(e) });
+    }
+  };
+
+  // Load webcam devices when dialog opens
+  useEffect(() => {
+    if (showDeviceDialog) {
+      listWebcamDevices()
+        .then(devices => {
+          setWebcamDevices(devices);
+          if (devices.video.length > 0) {
+            setSelectedVideoDevice(devices.video[0].index);
+          }
+          if (devices.audio.length > 0) {
+            setSelectedAudioDevice(devices.audio[0].index);
+          }
+        })
+        .catch(err => {
+          append({ webcamDeviceError: String(err) });
+        });
+    }
+  }, [showDeviceDialog]);
+
+  // Handle webcam recording toggle
+  const handleWebcamRecordToggle = async () => {
+    try {
+      if (!webcamRecordingId) {
+        // Prevent starting if screen recording is active
+        if (recordingId) {
+          append({ webcamError: 'Cannot start webcam recording while screen recording is active' });
+          return;
+        }
+        
+        // Show device selection dialog first
+        setShowDeviceDialog(true);
+      } else {
+        // Stop recording - FFmpeg handles everything, file is saved automatically
+        const outPath = await stopWebcamRecord(webcamRecordingId);
+        append({ webcamRecordingStopped: { recordingId: webcamRecordingId, outPath } });
+        
+        // Show success dialog with the saved file
+        setRecordingSuccess({ path: outPath });
+        setWebcamRecordingId("");
+      }
+    } catch (e) {
+      append({ webcamError: String(e) });
+      setWebcamRecordingId(""); // Reset on error
+    }
+  };
+
+  // Start recording with selected devices
+  const handleStartRecordingWithDevices = async () => {
+    try {
+      setShowDeviceDialog(false);
+      
+      const { recordingId: id, outPath } = await startWebcamRecord({ 
+        fps: 30, 
+        includeAudio: true,
+        videoDeviceIndex: selectedVideoDevice,
+        audioDeviceIndex: selectedAudioDevice
+      });
+      setWebcamRecordingId(id);
+      append({ webcamRecordingStarted: { id, outPath, videoDevice: selectedVideoDevice, audioDevice: selectedAudioDevice } });
+    } catch (e) {
+      append({ webcamError: String(e) });
+      setShowDeviceDialog(true); // Reopen dialog on error
     }
   };
 
@@ -159,9 +237,12 @@ export function UtilitiesPane() {
               <h3 className="text-sm font-semibold text-white/80">Screen Recording</h3>
               <Button
                 onClick={handleRecordToggle}
+                disabled={!!webcamRecordingId} // Disable if webcam recording is active
                 className={`w-full py-2 rounded transition-all ${
                   recordingId 
                     ? 'bg-red-600/80 hover:bg-red-600 text-white' 
+                    : webcamRecordingId
+                    ? 'bg-white/10 text-white/50 cursor-not-allowed'
                     : 'bg-gradient-cyan-purple text-white hover:opacity-90'
                 }`}
               >
@@ -169,15 +250,27 @@ export function UtilitiesPane() {
               </Button>
             </div>
 
+            {/* Webcam Recording Section */}
+            <div className="space-y-sm">
+              <h3 className="text-sm font-semibold text-white/80">Webcam Recording</h3>
+              <Button
+                onClick={handleWebcamRecordToggle}
+                disabled={!!recordingId} // Disable if screen recording is active
+                className={`w-full py-2 rounded transition-all ${
+                  webcamRecordingId
+                    ? 'bg-red-600/80 hover:bg-red-600 text-white' 
+                    : recordingId
+                    ? 'bg-white/10 text-white/50 cursor-not-allowed'
+                    : 'bg-gradient-cyan-purple text-white hover:opacity-90'
+                }`}
+              >
+                {webcamRecordingId ? '⏹ Stop Webcam Recording' : '📹 Start Webcam Recording'}
+              </Button>
+            </div>
+
             {/* Other Utilities (Disabled for now) */}
             <div className="space-y-sm">
               <h3 className="text-sm font-semibold text-white/80">Coming Soon™️</h3>
-              <Button
-                disabled
-                className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
-              >
-                Webcam Recording
-              </Button>
               <Button
                 disabled
                 className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
@@ -261,6 +354,76 @@ export function UtilitiesPane() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Device Selection Dialog */}
+      <Dialog open={showDeviceDialog} onOpenChange={setShowDeviceDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-h3 font-semibold gradient-text">
+              Select Recording Devices
+            </DialogTitle>
+            <DialogDescription>
+              Choose your camera and microphone for webcam recording
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-lg py-4">
+            {/* Video Device Selection */}
+            <div className="space-y-sm">
+              <label className="text-sm font-semibold text-white/80 flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                Camera
+              </label>
+              <select
+                value={selectedVideoDevice}
+                onChange={(e) => setSelectedVideoDevice(Number(e.target.value))}
+                className="w-full bg-white/10 border border-white/20 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-light-blue"
+              >
+                {webcamDevices?.video.map((device) => (
+                  <option key={device.index} value={device.index} className="bg-mid-navy">
+                    {device.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Audio Device Selection */}
+            <div className="space-y-sm">
+              <label className="text-sm font-semibold text-white/80 flex items-center gap-2">
+                <Mic className="h-4 w-4" />
+                Microphone
+              </label>
+              <select
+                value={selectedAudioDevice}
+                onChange={(e) => setSelectedAudioDevice(Number(e.target.value))}
+                className="w-full bg-white/10 border border-white/20 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-light-blue"
+              >
+                {webcamDevices?.audio.map((device) => (
+                  <option key={device.index} value={device.index} className="bg-mid-navy">
+                    {device.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end space-x-sm pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeviceDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="gradient"
+                onClick={handleStartRecordingWithDevices}
+                disabled={!webcamDevices || webcamDevices.video.length === 0}
+              >
+                Start Recording
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

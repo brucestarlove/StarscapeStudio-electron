@@ -56,6 +56,24 @@ export interface RecordSettings {
   fps?: number;
 }
 
+export interface WebcamRecordSettings {
+  fps?: number;
+  includeAudio?: boolean;
+  videoDeviceId?: string;
+  videoDeviceIndex?: number;
+  audioDeviceIndex?: number;
+}
+
+export interface WebcamDevice {
+  index: number;
+  name: string;
+}
+
+export interface WebcamDevices {
+  video: WebcamDevice[];
+  audio: WebcamDevice[];
+}
+
 export interface IngestRequest {
   file_paths: string[];
 }
@@ -108,6 +126,18 @@ export async function stopScreenRecord(recordingId: string): Promise<string> {
   return window.electronAPI.stopScreenRecord(recordingId);
 }
 
+export async function startWebcamRecord(settings: WebcamRecordSettings): Promise<{ recordingId: string; outPath: string }> {
+  return window.electronAPI.startWebcamRecord(settings);
+}
+
+export async function stopWebcamRecord(recordingId: string): Promise<string> {
+  return window.electronAPI.stopWebcamRecord(recordingId);
+}
+
+export async function listWebcamDevices(): Promise<WebcamDevices> {
+  return window.electronAPI.listWebcamDevices();
+}
+
 export async function listenStartRecording(
   handler: (event: { recordingId: string; sourceId: string; outputPath: string; settings: RecordSettings }) => void
 ): Promise<() => void> {
@@ -118,6 +148,18 @@ export async function listenStopRecording(
   handler: (event: { recordingId: string }) => void
 ): Promise<() => void> {
   return window.electronAPI.onStopRecording(handler);
+}
+
+export async function listenStartWebcamRecording(
+  handler: (event: { recordingId: string; outputPath: string; settings: WebcamRecordSettings }) => void
+): Promise<() => void> {
+  return window.electronAPI.onStartWebcamRecording(handler);
+}
+
+export async function listenStopWebcamRecording(
+  handler: (event: { recordingId: string }) => void
+): Promise<() => void> {
+  return window.electronAPI.onStopWebcamRecording(handler);
 }
 
 // File ingestion
@@ -154,9 +196,14 @@ declare global {
       listCaptureDevices: () => Promise<ListDevices>;
       startScreenRecord: (settings: RecordSettings) => Promise<{ recordingId: string; outPath: string }>;
       stopScreenRecord: (recordingId: string) => Promise<string>;
+      startWebcamRecord: (settings: WebcamRecordSettings) => Promise<{ recordingId: string; outPath: string }>;
+      stopWebcamRecord: (recordingId: string) => Promise<string>;
+      listWebcamDevices: () => Promise<WebcamDevices>;
       onExportProgress: (callback: (event: ProgressEvent) => void) => () => void;
       onStartRecording: (callback: (event: { recordingId: string; sourceId: string; outputPath: string; settings: RecordSettings }) => void) => () => void;
       onStopRecording: (callback: (event: { recordingId: string }) => void) => () => void;
+      onStartWebcamRecording: (callback: (event: { recordingId: string; outputPath: string; settings: WebcamRecordSettings }) => void) => () => void;
+      onStopWebcamRecording: (callback: (event: { recordingId: string }) => void) => () => void;
       revealInFinder: (filePath: string) => Promise<{ success: boolean }>;
     };
   }

@@ -21,7 +21,6 @@ interface ProjectStore extends ProjectState {
 
   // Clip actions
   createClip: (assetId: string, trackId: string, startMs: number) => string;
-  updateClip: (clipId: string, updates: Partial<Clip>) => void;
   deleteClip: (clipId: string) => void;
   moveClip: (clipId: string, trackId: string, startMs: number) => void;
   shiftClipsRight: (trackId: string, fromClipId: string, newStartMs: number) => void;
@@ -34,7 +33,6 @@ interface ProjectStore extends ProjectState {
   deselectAll: () => void;
 
   // Canvas actions
-  createCanvasNode: (clipId: string) => void;
   updateCanvasNode: (nodeId: string, updates: Partial<CanvasNode>) => void;
   deleteCanvasNode: (nodeId: string) => void;
 
@@ -168,12 +166,19 @@ export const useProjectStore = create<ProjectStore>()(
           const newAssets: Asset[] = ingestResults.map((result: IngestResult) => {
             const assetType = getAssetTypeFromPath(result.file_path);
 
+            console.log('📦 Creating asset from ingest result:', {
+              asset_id: result.asset_id,
+              file_path: result.file_path,
+              thumbnail_path: result.thumbnail_path,
+              original_file_name: result.original_file_name
+            });
+
             return {
               id: result.asset_id,
               type: assetType,
               name: result.original_file_name, // Use original file name
-              url: `media://${result.file_path}`, // Use custom media:// protocol for local files
-              thumbnailUrl: result.thumbnail_path ? `media://${result.thumbnail_path}` : undefined,
+              url: result.file_path, // Absolute file path (no protocol prefix)
+              thumbnailUrl: result.thumbnail_path || undefined,
               fileSize: result.file_size,
               duration: result.metadata.duration_ms,
               metadata: {
@@ -295,29 +300,24 @@ export const useProjectStore = create<ProjectStore>()(
           state.clips[clipId] = clip;
           track.clips.push(clipId);
 
-          // Create canvas node
+          // Create canvas node with appropriate defaults based on track
           const nodeId = generateId();
+          const isMainTrack = trackId === 'track-1';
+          
           state.canvasNodes[nodeId] = {
             id: nodeId,
             clipId,
-            x: 0,
-            y: 0,
-            width: 200,
-            height: 150,
+            // Main track (Track 1): Full canvas size
+            // PiP tracks (Track 2+): Bottom-right corner at 25% size
+            x: isMainTrack ? 0 : 1440,
+            y: isMainTrack ? 0 : 810,
+            width: isMainTrack ? 1920 : 480,
+            height: isMainTrack ? 1080 : 270,
             rotation: 0,
             opacity: 1,
           };
         });
         return clipId;
-      },
-
-      updateClip: (clipId: string, updates: Partial<Clip>) => {
-        set((state) => {
-          const clip = state.clips[clipId];
-          if (clip) {
-            Object.assign(clip, updates);
-          }
-        });
       },
 
       deleteClip: (clipId: string) => {
@@ -495,17 +495,20 @@ export const useProjectStore = create<ProjectStore>()(
 
           state.clips[newClipId] = newClip;
 
-          // Create canvas node for new clip
+          // Create canvas node for new clip (copy settings from original clip's node)
           const nodeId = generateId();
+          const originalNode = Object.values(state.canvasNodes).find(n => n.clipId === clipId);
+          
           state.canvasNodes[nodeId] = {
             id: nodeId,
             clipId: newClipId,
-            x: 0,
-            y: 0,
-            width: 200,
-            height: 150,
-            rotation: 0,
-            opacity: 1,
+            // Copy transform properties from the original clip's canvas node
+            x: originalNode?.x ?? 0,
+            y: originalNode?.y ?? 0,
+            width: originalNode?.width ?? 1920,
+            height: originalNode?.height ?? 1080,
+            rotation: originalNode?.rotation ?? 0,
+            opacity: originalNode?.opacity ?? 1,
           };
         });
       },
@@ -543,22 +546,6 @@ export const useProjectStore = create<ProjectStore>()(
       },
 
       // Canvas actions
-      createCanvasNode: (clipId: string) => {
-        set((state) => {
-          const nodeId = generateId();
-          state.canvasNodes[nodeId] = {
-            id: nodeId,
-            clipId,
-            x: 0,
-            y: 0,
-            width: 200,
-            height: 150,
-            rotation: 0,
-            opacity: 1,
-          };
-        });
-      },
-
       updateCanvasNode: (nodeId: string, updates: Partial<CanvasNode>) => {
         set((state) => {
           const node = state.canvasNodes[nodeId];

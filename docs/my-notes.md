@@ -25,19 +25,56 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 [x] split
 [x] import asset with the original name
 [x] better dragging, arrange clips in a sequence
-[ ] right click menu to rename asset
-[ ] right pane with edit features (and making the whole layout responsive)
+[x] right click menu to rename asset
+[x] right pane with edit features (and making the whole layout responsive)
 [x] asset metadata: resolution and file size
-[ ] snap to grid / snap to clip edges etc
-[ ] mouse scroll linked to zoom in/out
+[x] snap to clip edges
+[x] shift + mouse scroll linked to zoom in/out
 [x] smooth seek header interactivity
+
+## remaining for MVP
+[ ] better trim
+[ ] multiple tracks (main + overlay/PiP)
+[ ] webm?
+[ ] fix export resolution
+[ ] Webcam recording (access system camera)
+[ ] Simultaneous screen + webcam (picture-in-picture style)
+[ ] Audio capture from microphone
+[ ] Record, stop, and save recordings directly to timeline
 [ ] progress indicator during export
+
+## stretch goals
+[ ] Text overlays with custom fonts and animations
+[ ] Transitions between clips (fade, slide, etc.)
+[ ] Audio controls (volume adjustment, fade in/out)
+[ ] Filters and effects (brightness, contrast, saturation)
+[ ] Export presets for different platforms (YouTube, Instagram, TikTok)
+[ ] Keyboard shortcuts for common actions
+[ ] Auto-save project state
+[ ] Undo/redo functionality
+
+## Testing Scenarios
+We'll test your app with:
+[ ] Recording a 30-second screen capture and adding it to timeline
+[ ] Importing 3 video clips and arranging them in sequence
+[ ] Trimming clips and splitting at various points
+[ ] Exporting a 2-minute video with multiple clips
+[ ] Using webcam recording and overlay on screen recording
+[ ] Testing on both Mac and Windows if possible
+
+## Performance Targets
+[ ] Timeline UI remains responsive with 10+ clips
+[ ] Preview playback is smooth (30 fps minimum)
+[ ] Export completes without crashes
+[ ] App launch time under 5 seconds
+[ ] No memory leaks during extended editing sessions (test for 15+ minutes)
+[ ] File size: Exported videos should maintain reasonable quality (not bloated)
+
+## other
+[ ] generated captions
+[ ] text custom fonts and animations
 [ ] hide scrolllbars unless actively scrolling
-
-## extra
-
 [ ] upload export to cloud storage
-[ ] text overlays with custom fonts and animations
 [ ] transitions between clips
 [ ] audio controls
 [ ] filters and effects (brightness, contrast, saturation)
@@ -49,4 +86,3 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 
 [ ] cosmic asset generation specifically
 [ ] integrate with other Starscape
-[ ]
