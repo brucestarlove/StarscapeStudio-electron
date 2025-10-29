@@ -17,6 +17,7 @@ function App() {
   const { createClip, moveClip, trimClip, deleteClip, getSelectedClips } = useProjectStore();
   const { activeLeftPaneTab } = useUiStore();
   const [playheadDragStartX, setPlayheadDragStartX] = useState<number | null>(null);
+  const [lastDragX, setLastDragX] = useState<number>(0);
   const [clipDragData, setClipDragData] = useState<{ activeId: string; positionMs: number } | null>(null);
 
   // Configure drag sensors with activation constraints
@@ -97,13 +98,14 @@ function App() {
     
     const dragItem = active.data.current as DragItem;
     if (dragItem.type === 'playhead') {
-      // Store initial position for playhead dragging
+      // Store initial position for playhead dragging - track last X for incremental updates
       const { currentTimeMs, zoom } = usePlaybackStore.getState();
       const tracksScrollContainer = document.getElementById('tracks-scroll');
       if (tracksScrollContainer) {
         const rect = tracksScrollContainer.getBoundingClientRect();
         // Store the starting X position relative to the scroll container
         setPlayheadDragStartX(rect.left + (currentTimeMs * zoom));
+        setLastDragX(0); // Reset to 0 at drag start
       }
     }
   };
@@ -120,9 +122,13 @@ function App() {
     if (dragItem.type === 'playhead' && playheadDragStartX !== null) {
       const { seek, zoom, currentTimeMs } = usePlaybackStore.getState();
       
-      // Calculate new position based on mouse movement
-      const deltaMs = pixelsToMs(delta.x, zoom);
+      // Calculate incremental delta since last move (delta.x is cumulative from drag start)
+      const incrementalDeltaX = delta.x - lastDragX;
+      const deltaMs = pixelsToMs(incrementalDeltaX, zoom);
       const newTimeMs = Math.max(0, currentTimeMs + deltaMs);
+      
+      // Update last position for next delta calculation
+      setLastDragX(delta.x);
       
       // Update playhead position in real-time (no snapping during drag)
       seek(newTimeMs);
@@ -167,6 +173,7 @@ function App() {
       const snappedTime = snapToTimeline(currentTimeMs, zoom, snapEnabled);
       seek(Math.max(0, snappedTime));
       setPlayheadDragStartX(null);
+      setLastDragX(0); // Reset for next drag
       return;
     }
 
