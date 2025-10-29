@@ -30,6 +30,7 @@ function createWindow() {
     width: 1400,
     height: 900,
     title: 'Starscape ClipForge',
+    icon: path.join(__dirname, '../build-resources/icons/icon.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
