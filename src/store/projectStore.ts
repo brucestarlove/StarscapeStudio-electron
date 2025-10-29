@@ -391,20 +391,29 @@ export const useProjectStore = create<ProjectStore>()(
           if (!asset) return;
 
           if (side === 'left') {
-            const newTrimStart = Math.max(0, clip.trimStartMs + deltaMs);
-            const newTrimEnd = Math.min(asset.duration, clip.trimEndMs);
+            // Calculate new trim start, clamped to [0, asset.duration]
+            const newTrimStart = Math.max(0, Math.min(asset.duration, clip.trimStartMs + deltaMs));
+            // Calculate new startMs position on timeline, must not go below 0
+            const newStartMs = Math.max(0, clip.startMs + deltaMs);
 
-            if (newTrimStart < newTrimEnd) {
+            // Ensure the left edge doesn't cross over the right edge
+            // The clip must have at least some duration (e.g., 10ms minimum)
+            const minClipDuration = 10; // minimum 10ms
+            if (newTrimStart < clip.trimEndMs - minClipDuration && newStartMs < clip.endMs - minClipDuration) {
               clip.trimStartMs = newTrimStart;
-              clip.startMs += deltaMs;
+              clip.startMs = newStartMs;
             }
           } else {
-            const newTrimEnd = Math.min(asset.duration, clip.trimEndMs + deltaMs);
-            const newTrimStart = Math.max(0, clip.trimStartMs);
+            // Calculate new trim end, clamped to [0, asset.duration]
+            const newTrimEnd = Math.max(0, Math.min(asset.duration, clip.trimEndMs + deltaMs));
+            // Calculate new endMs position on timeline
+            const newEndMs = clip.endMs + deltaMs;
 
-            if (newTrimStart < newTrimEnd) {
+            // Ensure the right edge doesn't cross over the left edge
+            const minClipDuration = 10; // minimum 10ms
+            if (newTrimEnd > clip.trimStartMs + minClipDuration && newEndMs > clip.startMs + minClipDuration) {
               clip.trimEndMs = newTrimEnd;
-              clip.endMs += deltaMs;
+              clip.endMs = newEndMs;
             }
           }
         });

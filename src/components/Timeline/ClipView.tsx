@@ -94,7 +94,7 @@ export function ClipView({ clip }: ClipViewProps) {
       ref={setNodeRef}
       data-clip-id={clip.id}
       className={cn(
-        "absolute top-2 bottom-2 timeline-clip cursor-pointer rounded-sm shadow-lg",
+        "absolute top-2 bottom-2 timeline-clip rounded-sm shadow-lg",
         "bg-linear-to-r from-light-blue/20 to-cyan-500/20 border border-light-blue/30",
         isSelected && "ring-2 ring-light-blue ring-opacity-60 shadow-xl shadow-light-blue/30",
         isDragging && "opacity-50"
@@ -104,11 +104,13 @@ export function ClipView({ clip }: ClipViewProps) {
         width: `${Math.max(clipWidth, 20)}px`, // Minimum width
       }}
       onClick={handleClick}
-      {...listeners}
-      {...attributes}
     >
-      {/* Clip content */}
-      <div className="h-full flex items-center px-sm">
+      {/* Clip content - this is the draggable area */}
+      <div
+        className="h-full flex items-center px-sm cursor-pointer"
+        {...listeners}
+        {...attributes}
+      >
         <Icon className="h-3 w-3 text-white/70 mr-xs shrink-0" />
         <span className="text-caption text-white truncate">
           {asset.name}
@@ -129,7 +131,7 @@ export function ClipView({ clip }: ClipViewProps) {
           <div
             className={cn(
               "absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-l-sm",
-              "bg-gradient-to-r from-light-blue/60 to-light-blue/40",
+              "bg-linear-to-r from-light-blue/60 to-light-blue/40",
               isSelected ? "opacity-100" : "opacity-0"
             )}
             onMouseDown={(e) => handleTrimStart('left', e)}
@@ -139,7 +141,7 @@ export function ClipView({ clip }: ClipViewProps) {
           <div
             className={cn(
               "absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-r-sm",
-              "bg-gradient-to-l from-light-blue/60 to-light-blue/40",
+              "bg-linear-to-l from-light-blue/60 to-light-blue/40",
               isSelected ? "opacity-100" : "opacity-0"
             )}
             onMouseDown={(e) => handleTrimStart('right', e)}
