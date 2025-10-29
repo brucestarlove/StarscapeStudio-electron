@@ -14,7 +14,7 @@ import type { DragItem } from "@/types";
 import "./globals.css";
 
 function App() {
-  const { createClip, moveClip, trimClip } = useProjectStore();
+  const { createClip, moveClip, trimClip, deleteClip, getSelectedClips } = useProjectStore();
   const { activeLeftPaneTab } = useUiStore();
   const [playheadDragStartX, setPlayheadDragStartX] = useState<number | null>(null);
   const [clipDragData, setClipDragData] = useState<{ activeId: string; positionMs: number } | null>(null);
@@ -31,6 +31,27 @@ function App() {
       window.removeEventListener('drop', prevent);
     };
   }, []);
+
+  // Handle Delete key for deleting selected clips
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const selectedClips = getSelectedClips();
+        if (selectedClips.length > 0) {
+          e.preventDefault();
+          // Delete each selected clip
+          selectedClips.forEach(clip => {
+            deleteClip(clip.id);
+          });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [deleteClip, getSelectedClips]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
