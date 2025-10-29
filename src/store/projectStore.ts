@@ -23,7 +23,7 @@ interface ProjectStore extends ProjectState {
   updateClip: (clipId: string, updates: Partial<Clip>) => void;
   deleteClip: (clipId: string) => void;
   moveClip: (clipId: string, trackId: string, startMs: number) => void;
-  shiftClipsRight: (trackId: string, fromClipId: string, shiftAmount: number) => void;
+  shiftClipsRight: (trackId: string, fromClipId: string, newStartMs: number) => void;
   trimClip: (clipId: string, side: 'left' | 'right', deltaMs: number) => void;
   splitClip: (clipId: string, atMs: number) => void;
 
@@ -356,7 +356,7 @@ export const useProjectStore = create<ProjectStore>()(
         });
       },
 
-      shiftClipsRight: (trackId: string, fromClipId: string, shiftAmount: number) => {
+      shiftClipsRight: (trackId: string, fromClipId: string, newStartMs: number) => {
         set((state) => {
           const fromClip = state.clips[fromClipId];
           if (!fromClip) return;
@@ -371,11 +371,13 @@ export const useProjectStore = create<ProjectStore>()(
             .filter((clip: Clip) => clip.startMs >= fromClip.startMs)
             .sort((a: Clip, b: Clip) => a.startMs - b.startMs);
 
-          // Shift each clip to the right
+          // Position clips sequentially starting from newStartMs
+          let currentPosition = newStartMs;
           clipsToShift.forEach((clip: Clip) => {
             const duration = clip.endMs - clip.startMs;
-            clip.startMs += shiftAmount;
-            clip.endMs = clip.startMs + duration;
+            clip.startMs = currentPosition;
+            clip.endMs = currentPosition + duration;
+            currentPosition = clip.endMs; // Next clip starts where this one ends
           });
         });
       },

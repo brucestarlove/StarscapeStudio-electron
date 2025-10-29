@@ -260,7 +260,9 @@ function App() {
 
         // If we need to insert before a clip, shift it and subsequent clips first
         if (resolution.shouldShift && resolution.targetClipId) {
-          shiftClipsRight(dropResult.trackId, resolution.targetClipId, resolution.shiftAmount!);
+          // Calculate where the target clip should start (at the end of the dragged clip)
+          const newTargetStartMs = resolution.resolvedStartMs + clipDuration;
+          shiftClipsRight(dropResult.trackId, resolution.targetClipId, newTargetStartMs);
         }
 
         // Create the clip at the resolved position
@@ -298,7 +300,9 @@ function App() {
 
         // If we need to insert before a clip, shift it and subsequent clips first
         if (resolution.shouldShift && resolution.targetClipId) {
-          shiftClipsRight(dropResult.trackId, resolution.targetClipId, resolution.shiftAmount!);
+          // Calculate where the target clip should start (at the end of the dragged clip)
+          const newTargetStartMs = resolution.resolvedStartMs + clipDuration;
+          shiftClipsRight(dropResult.trackId, resolution.targetClipId, newTargetStartMs);
         }
 
         // Move the clip to the resolved position

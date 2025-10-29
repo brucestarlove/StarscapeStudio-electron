@@ -130,7 +130,6 @@ export function resolveClipCollision(
   shouldShift: boolean;
   shouldCancel: boolean;
   targetClipId?: string;
-  shiftAmount?: number;
 } {
   const desiredEndMs = desiredStartMs + clipDuration;
 
@@ -152,6 +151,17 @@ export function resolveClipCollision(
       // User wants to insert before the target clip
       const proposedStartMs = targetClip.startMs - clipDuration;
 
+      // Special case: if proposed position would be before timeline start (< 0)
+      // Place at 0 and shift the target and subsequent clips
+      if (proposedStartMs < 0) {
+        return {
+          resolvedStartMs: 0,
+          shouldShift: true,
+          shouldCancel: false,
+          targetClipId: targetClip.id
+        };
+      }
+
       // Check if we can fit to the left without shifting (no overlap with earlier clips)
       if (proposedStartMs >= 0) {
         const proposedEndMs = targetClip.startMs;
@@ -169,27 +179,15 @@ export function resolveClipCollision(
             shouldShift: false,
             shouldCancel: false
           };
+        } else {
+          // There's another clip to the left that would overlap - cancel the drop
+          return {
+            resolvedStartMs: desiredStartMs,
+            shouldShift: false,
+            shouldCancel: true
+          };
         }
       }
-
-      // Can't fit to the left without overlapping - check if we're at timeline start
-      if (targetClip.startMs === 0) {
-        // Target is at position 0, we need to shift it right
-        return {
-          resolvedStartMs: 0,
-          shouldShift: true,
-          shouldCancel: false,
-          targetClipId: targetClip.id,
-          shiftAmount: clipDuration
-        };
-      }
-
-      // There's another clip to the left that would overlap - cancel the drop
-      return {
-        resolvedStartMs: desiredStartMs,
-        shouldShift: false,
-        shouldCancel: true
-      };
     } else {
       // Drop on right half - place after the target clip (original behavior)
       return {
