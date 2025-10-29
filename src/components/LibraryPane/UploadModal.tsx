@@ -8,19 +8,42 @@ import { openFileDialog } from "@/lib/bindings";
 interface UploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onDuplicateDetected?: (filename: string) => void;
 }
 
-export function UploadModal({ open, onOpenChange }: UploadModalProps) {
+export function UploadModal({ open, onOpenChange, onDuplicateDetected }: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const { addAssetsFromPaths } = useProjectStore();
+  const { addAssetsFromPaths, assets } = useProjectStore();
+
+  // Browser-compatible function to extract filename from path
+  const getFilename = (filePath: string): string => {
+    // Handle both forward slashes (macOS/Linux) and backslashes (Windows)
+    const parts = filePath.replace(/\\/g, '/').split('/');
+    return parts[parts.length - 1];
+  };
 
   const handleUploadClick = async () => {
     setIsUploading(true);
     try {
       const result = await openFileDialog();
       if (result.filePaths && result.filePaths.length > 0) {
-        await addAssetsFromPaths(result.filePaths);
-        onOpenChange(false);
+        // Check for duplicates by filename
+        const existingFilenames = new Set(assets.map(a => a.name));
+        let hasDuplicates = false;
+        
+        for (const filePath of result.filePaths) {
+          const filename = getFilename(filePath);
+          if (existingFilenames.has(filename)) {
+            hasDuplicates = true;
+            onDuplicateDetected?.(filename);
+            break;
+          }
+        }
+        
+        if (!hasDuplicates) {
+          await addAssetsFromPaths(result.filePaths);
+          onOpenChange(false);
+        }
       }
     } catch (error) {
       console.error('Error selecting files:', error);

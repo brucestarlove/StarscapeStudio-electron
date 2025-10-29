@@ -116,7 +116,3 @@ export const usePlaybackStore = create<PlaybackStore>()((set) => ({
     set((state) => ({ isMuted: !state.isMuted }));
   },
 }));
-
-// Note: Playback loop is now handled by individual components (Stage.tsx)
-// to avoid conflicts and ensure smooth video synchronization
-// Audio playback is managed by AudioManager singleton
