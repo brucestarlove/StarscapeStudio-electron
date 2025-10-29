@@ -6,10 +6,43 @@ import { TrackHeader } from "./TrackHeader";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { msToPixels } from "@/lib/utils";
+import { useRef, useEffect } from "react";
 
 export function TimelineDock() {
   const { tracks, getTimelineDuration } = useProjectStore();
-  const { zoom } = usePlaybackStore();
+  const { zoom, setZoom } = usePlaybackStore();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Handle scroll wheel for zooming
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      // Only zoom if scroll is vertical (deltaY)
+      if (Math.abs(event.deltaY) === 0) return;
+
+      // Prevent default scroll behavior and zoom instead
+      event.preventDefault();
+
+      // Zoom with smaller increments (0.02 per scroll event)
+      const zoomIncrement = 0.02;
+      if (event.deltaY < 0) {
+        // Scroll up = zoom in
+        setZoom(zoom + zoomIncrement);
+      } else {
+        // Scroll down = zoom out
+        setZoom(zoom - zoomIncrement);
+      }
+    };
+
+    // Add listener with passive: false to allow preventDefault
+    container.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+    };
+  }, [zoom, setZoom]);
 
   // Calculate minimum width based on timeline duration
   const timelineDuration = getTimelineDuration();
@@ -29,7 +62,11 @@ export function TimelineDock() {
       </div>
 
       {/* Scrollable tracks area - headers and tracks together */}
-      <div className="flex-1 overflow-auto scrollbar-starscape bg-linear-to-b from-dark-navy/50 to-mid-navy/30 relative" id="tracks-scroll">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-auto scrollbar-starscape bg-linear-to-b from-dark-navy/50 to-mid-navy/30 relative"
+        id="tracks-scroll"
+      >
         {/* Wide container for timeline */}
         <div className="flex">
           {/* Fixed track headers column */}
