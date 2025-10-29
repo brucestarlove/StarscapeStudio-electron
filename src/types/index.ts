@@ -60,6 +60,8 @@ export interface PlaybackState {
   playing: boolean;
   zoom: number;         // Pixels per millisecond
   snapEnabled: boolean;
+  volume: number;       // Master volume (0-1)
+  isMuted: boolean;     // Mute state
 }
 
 export interface ExportSettings {

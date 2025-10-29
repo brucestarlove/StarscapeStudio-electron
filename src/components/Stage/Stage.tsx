@@ -2,6 +2,7 @@ import { Play, Music } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { useEffect, useRef } from "react";
+import { audioManager } from "@/lib/AudioManager";
 import type { Clip } from "@/types";
 
 export function Stage() {
@@ -10,15 +11,32 @@ export function Stage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isSeekingRef = useRef(false); // Track if we're programmatically seeking
   const loadedAssetIdRef = useRef<string | null>(null); // Track which asset is loaded
+  const cleanupRef = useRef(false); // Track if component is unmounting
 
   // Find the visible clip at current time
   const visibleClip = getVisibleClip(clips, tracks, currentTimeMs);
   const visibleAsset = visibleClip ? getAssetById(visibleClip.assetId) : null;
 
+  // Get all active audio clips for synchronization
+  const audioClips = getAudioClips(clips, tracks, currentTimeMs);
+
   // Calculate source video time accounting for trim
   const sourceTimeMs = visibleClip 
     ? (currentTimeMs - visibleClip.startMs) + visibleClip.trimStartMs
     : 0;
+
+  // Initialize audio manager with video element on mount
+  useEffect(() => {
+    if (videoRef.current) {
+      audioManager.setVideoElement(videoRef.current);
+    }
+
+    return () => {
+      cleanupRef.current = true;
+      // Don't fully clear on unmount as we might re-mount, just clear video reference
+      audioManager.setVideoElement(null);
+    };
+  }, []);
 
   // Load video source when asset changes
   useEffect(() => {
@@ -113,6 +131,29 @@ export function Stage() {
     };
   }, [visibleClip, playing, seek]);
 
+  // Synchronize all audio sources with timeline position
+  useEffect(() => {
+    if (!playing) return;
+
+    // Sync all audio elements to current timeline position
+    const audioClipsWithAssets = audioClips.map(clip => ({
+      clip: clip,
+      asset: getAssetById(clip.assetId)!,
+      track: tracks.find(t => t.id === clip.trackId)!,
+    }));
+
+    audioManager.syncToTime(currentTimeMs, audioClipsWithAssets);
+  }, [currentTimeMs, audioClips, playing, getAssetById, tracks]);
+
+  // Handle play/pause state for audio manager
+  useEffect(() => {
+    if (playing) {
+      audioManager.play();
+    } else {
+      audioManager.pause();
+    }
+  }, [playing]);
+
   return (
     <div className="h-full bg-dark-navy p-md">
       <div className="h-full flex flex-col">
@@ -136,7 +177,6 @@ export function Stage() {
                   <video
                     ref={videoRef}
                     className="w-full h-full object-contain"
-                    muted
                     playsInline
                     onError={(e) => {
                       console.error('Video playback error:', e);
@@ -214,6 +254,23 @@ function getVisibleClip(clips: Record<string, Clip>, tracks: any[], currentTimeM
     if (clip) return clip;
   }
   return null;
+}
+
+// Helper function to get all audio clips that should be playing at current time
+function getAudioClips(clips: Record<string, Clip>, tracks: any[], currentTimeMs: number): Clip[] {
+  const audioClips: Clip[] = [];
+  
+  for (const track of tracks.filter(t => t.type === 'audio' && t.visible)) {
+    for (const clipId of track.clips) {
+      const clip = clips[clipId];
+      // Include clip if current time falls within it
+      if (clip && currentTimeMs >= clip.startMs && currentTimeMs < clip.endMs) {
+        audioClips.push(clip);
+      }
+    }
+  }
+  
+  return audioClips;
 }
 
 // Helper function to format timecode
