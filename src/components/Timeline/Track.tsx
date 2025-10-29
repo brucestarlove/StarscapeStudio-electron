@@ -9,7 +9,7 @@ interface TrackProps {
 
 export function Track({ trackId }: TrackProps) {
   const { tracks, getClipsByTrack } = useProjectStore();
-  
+
   const track = tracks.find(t => t.id === trackId);
   const clips = getClipsByTrack(trackId);
 
@@ -27,7 +27,7 @@ export function Track({ trackId }: TrackProps) {
     <div
       ref={setNodeRef}
       className={cn(
-        "timeline-track h-32 relative bg-gradient-to-r from-mid-navy/50 to-mid-navy/30 border-b border-white/10",
+        "timeline-track h-32 relative bg-linear-to-r from-mid-navy/50 to-mid-navy/30 border-b border-white/10",
         isOver && "bg-light-blue/10",
         !track.visible && "opacity-50"
       )}

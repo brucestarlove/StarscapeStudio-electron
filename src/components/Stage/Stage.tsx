@@ -6,12 +6,15 @@ import { audioManager } from "@/lib/AudioManager";
 import type { Clip } from "@/types";
 
 export function Stage() {
-  const { canvasNodes, clips, getAssetById, tracks } = useProjectStore();
-  const { currentTimeMs, playing, seek } = usePlaybackStore();
+  const { canvasNodes, clips, getAssetById, tracks, getTimelineDuration } = useProjectStore();
+  const { currentTimeMs, playing, seek, pause } = usePlaybackStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const isSeekingRef = useRef(false); // Track if we're programmatically seeking
   const loadedAssetIdRef = useRef<string | null>(null); // Track which asset is loaded
+  const loadedClipIdRef = useRef<string | null>(null); // Track which clip is loaded
   const cleanupRef = useRef(false); // Track if component is unmounting
+  const playPromiseRef = useRef<Promise<void> | null>(null); // Track pending play promise
+  const timelineDuration = getTimelineDuration(); // Get timeline endpoint
 
   // Find the visible clip at current time
   const visibleClip = getVisibleClip(clips, tracks, currentTimeMs);
@@ -38,98 +41,196 @@ export function Stage() {
     };
   }, []);
 
-  // Load video source when asset changes
+  // Load video source when asset or clip changes, or clear it when no asset
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !visibleAsset) return;
+    if (!video) return;
 
-    // Only update source if the asset actually changed
-    if (loadedAssetIdRef.current !== visibleAsset.id) {
-      console.log('Loading new video source:', visibleAsset.url);
-      video.src = visibleAsset.url;
-      video.load();
-      loadedAssetIdRef.current = visibleAsset.id;
+    // If no visible asset, clear the video source completely
+    if (!visibleAsset || !visibleClip) {
+      if (loadedAssetIdRef.current !== null) {
+        console.log('Clearing video source (no visible asset/clip)');
+        
+        // Wait for any pending play promise to resolve before clearing
+        if (playPromiseRef.current) {
+          playPromiseRef.current.then(() => {
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+          }).catch(() => {
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+          });
+        } else {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        }
+        
+        loadedAssetIdRef.current = null;
+        loadedClipIdRef.current = null;
+        playPromiseRef.current = null;
+      }
+      return;
     }
-  }, [visibleAsset]);
 
-  // Sync video playback with store - only for play/pause and manual seeks
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !visibleAsset) return;
-
-    // Sync play/pause state
-    if (playing && video.paused) {
-      console.log('Starting video playback');
-      video.play().catch(err => {
-        console.error('Play error:', err);
-      });
-    } else if (!playing && !video.paused) {
-      console.log('Pausing video');
-      video.pause();
-    }
-  }, [visibleAsset, playing]);
-
-  // Handle manual seeking (when currentTimeMs changes significantly)
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !visibleClip || isSeekingRef.current) return;
-
-    const targetTime = sourceTimeMs / 1000; // Convert to seconds
-    const timeDiff = Math.abs(video.currentTime - targetTime);
+    // Check if we need to reload the video (asset changed OR different clip of same asset)
+    const needsReload = loadedAssetIdRef.current !== visibleAsset.id || 
+                       loadedClipIdRef.current !== visibleClip.id;
     
-    // Only seek if there's a significant difference (user manually seeked)
-    // Use a larger threshold to avoid triggering during normal playback
-    if (timeDiff > 0.5) {
-      console.log('Manual seek detected, seeking video to:', targetTime);
-      isSeekingRef.current = true;
-      video.currentTime = targetTime;
-      // Reset flag after a short delay
-      setTimeout(() => {
-        isSeekingRef.current = false;
-      }, 100);
+    if (needsReload) {
+      console.log(`Loading video: asset=${visibleAsset.name}, clip=${visibleClip.id}`);
+      
+      // Wait for any pending play promise before changing source
+      const loadNewSource = () => {
+        video.src = visibleAsset.url;
+        video.load();
+        loadedAssetIdRef.current = visibleAsset.id;
+        loadedClipIdRef.current = visibleClip.id;
+        playPromiseRef.current = null;
+      };
+      
+      if (playPromiseRef.current) {
+        playPromiseRef.current
+          .then(loadNewSource)
+          .catch(loadNewSource);
+      } else {
+        loadNewSource();
+      }
     }
-  }, [sourceTimeMs, visibleClip]);
+  }, [visibleAsset, visibleClip]);
 
-  // Update playback store as video plays - use requestAnimationFrame for smoother updates
+  // Sync video playback with store - play when there's a visible clip, pause when in empty space
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // If we have a visible asset and timeline is playing, play the video
+    if (visibleAsset && visibleClip && playing && video.paused) {
+      console.log(`▶️  Starting video playback for clip ${visibleClip.id}`);
+      
+      // Wait for any existing play promise to finish
+      if (playPromiseRef.current) {
+        playPromiseRef.current.catch(() => {}).then(() => {
+          if (video && video.paused && playing) {
+            playPromiseRef.current = video.play().catch(err => {
+              console.error('Play error:', err);
+              playPromiseRef.current = null;
+            });
+          }
+        });
+      } else {
+        playPromiseRef.current = video.play().catch(err => {
+          console.error('Play error:', err);
+          playPromiseRef.current = null;
+        });
+      }
+    } 
+    // If no visible asset or timeline is paused, pause the video
+    else if ((!visibleAsset || !visibleClip || !playing) && !video.paused) {
+      console.log('⏸️  Pausing video (no visible clip or timeline paused)');
+      
+      // Wait for play promise to resolve before pausing
+      if (playPromiseRef.current) {
+        playPromiseRef.current.then(() => {
+          if (video && !video.paused) {
+            video.pause();
+          }
+        }).catch(() => {
+          if (video && !video.paused) {
+            video.pause();
+          }
+        }).finally(() => {
+          playPromiseRef.current = null;
+        });
+      } else {
+        video.pause();
+      }
+    }
+  }, [visibleAsset, visibleClip, playing]);
+
+  // Synchronize video element time with timeline when there's a visible clip
+  // Only sync on significant changes (seeking, clip changes) not during normal playback
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !visibleClip || !playing) return;
 
+    const targetTime = sourceTimeMs / 1000; // Convert to seconds
+    const timeDiff = Math.abs(video.currentTime - targetTime);
+    
+    // Only sync if significantly out of sync (>200ms)
+    // This prevents constant micro-adjustments during playback
+    if (timeDiff > 0.2) {
+      console.log(`🔄 Syncing video time: ${video.currentTime.toFixed(2)}s → ${targetTime.toFixed(2)}s (drift: ${(timeDiff * 1000).toFixed(0)}ms)`);
+      video.currentTime = targetTime;
+    }
+  }, [visibleClip?.id, playing]); // Only sync when clip changes or playback state changes
+
+  // Master playback loop - independent of clips, drives timeline forward
+  // This is the professional-grade approach: playback continues regardless of clips
+  useEffect(() => {
+    if (!playing) return;
+
     let animationFrameId: number;
-    let lastUpdateTime = 0;
+    let lastFrameTime = performance.now();
+    let lastLogTime = performance.now();
+    let lastLoggedClipId: string | null = null;
 
-    const updatePlaybackPosition = () => {
-      if (!video || !visibleClip || isSeekingRef.current) {
-        animationFrameId = requestAnimationFrame(updatePlaybackPosition);
-        return;
+    const updatePlaybackPosition = (currentFrameTime: number) => {
+      // Calculate elapsed time since last frame
+      const deltaTime = currentFrameTime - lastFrameTime;
+      lastFrameTime = currentFrameTime;
+
+      // Get current state
+      const { currentTimeMs, seek, pause } = usePlaybackStore.getState();
+      const timelineDuration = getTimelineDuration();
+
+      // Advance timeline by delta time (in milliseconds)
+      const newTimeMs = currentTimeMs + deltaTime;
+
+      // Check if we've reached the end of the timeline
+      if (newTimeMs >= timelineDuration) {
+        console.log('⏹️  Reached timeline end');
+        // Stop at timeline end
+        seek(timelineDuration);
+        pause();
+        return; // Stop the animation loop
       }
 
-      const now = performance.now();
-      // Throttle updates to ~60fps (every ~16ms)
-      if (now - lastUpdateTime < 16) {
-        animationFrameId = requestAnimationFrame(updatePlaybackPosition);
-        return;
+      // Update timeline position
+      seek(newTimeMs);
+      
+      // Debug logging every 500ms or when clip changes
+      const currentClip = getVisibleClip(clips, tracks, newTimeMs);
+      const clipId = currentClip?.id || 'empty';
+      
+      if (currentFrameTime - lastLogTime > 500 || clipId !== lastLoggedClipId) {
+        const timeFormatted = (newTimeMs / 1000).toFixed(2);
+        if (currentClip) {
+          console.log(`⏱️  Playing: ${timeFormatted}s | Clip: ${clipId} (${currentClip.startMs}-${currentClip.endMs}ms)`);
+        } else {
+          console.log(`⏱️  Playing: ${timeFormatted}s | Empty space`);
+        }
+        lastLogTime = currentFrameTime;
+        lastLoggedClipId = clipId;
       }
-      lastUpdateTime = now;
-
-      // Calculate timeline time from video time
-      const videoTimeMs = video.currentTime * 1000;
-      const timelineTimeMs = (videoTimeMs - visibleClip.trimStartMs) + visibleClip.startMs;
       
-      // Update store with the current playback position
-      seek(timelineTimeMs);
-      
+      // Continue the loop
       animationFrameId = requestAnimationFrame(updatePlaybackPosition);
     };
 
+    console.log('▶️  Starting master playback loop');
+    // Start the loop
     animationFrameId = requestAnimationFrame(updatePlaybackPosition);
 
     return () => {
+      console.log('⏹️  Stopping master playback loop');
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [visibleClip, playing, seek]);
+  }, [playing, getTimelineDuration, clips, tracks]);
 
   // Synchronize all audio sources with timeline position
   useEffect(() => {

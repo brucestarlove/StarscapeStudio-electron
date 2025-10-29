@@ -7,6 +7,7 @@ export interface Asset {
   url: string;          // Object URL for local files
   duration: number;     // milliseconds
   thumbnailUrl?: string;
+  fileSize?: number;    // bytes
   metadata: {
     width?: number;
     height?: number;
@@ -53,6 +54,7 @@ export interface ProjectState {
   clips: Record<string, Clip>;
   canvasNodes: Record<string, CanvasNode>;
   selectedClipIds: string[];
+  selectedTrackId: string | null;
 }
 
 export interface PlaybackState {

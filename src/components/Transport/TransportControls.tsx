@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, SkipBack, SkipForward, ZoomIn, ZoomOut, Magnet, Volume2, VolumeX } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, ZoomIn, ZoomOut, Magnet, Volume2, VolumeX, Scissors } from "lucide-react";
 import { usePlaybackStore } from "@/store/playbackStore";
+import { useProjectStore } from "@/store/projectStore";
 import { audioManager } from "@/lib/AudioManager";
 import { formatTimecode } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,8 @@ export function TransportControls() {
     toggleMute,
   } = usePlaybackStore();
 
+  const { selectedClipIds, splitClip, getSelectedClips } = useProjectStore();
+
   // Sync volume and mute state with AudioManager
   useEffect(() => {
     audioManager.setVolume(volume);
@@ -39,6 +42,26 @@ export function TransportControls() {
 
   const handleVolumeChange = (value: number[]) => {
     setVolume(value[0]);
+  };
+
+  const handleSplit = () => {
+    // Check if a clip is selected
+    if (selectedClipIds.length !== 1) {
+      console.warn('Please select exactly one clip to split');
+      return;
+    }
+
+    const selectedClip = getSelectedClips()[0];
+    if (!selectedClip) return;
+
+    // Check if playhead is within the clip bounds
+    if (currentTimeMs <= selectedClip.startMs || currentTimeMs >= selectedClip.endMs) {
+      console.warn('Playhead must be inside the clip bounds to split');
+      return;
+    }
+
+    // Split the clip at the current playhead position
+    splitClip(selectedClipIds[0], currentTimeMs);
   };
 
   return (
@@ -74,6 +97,25 @@ export function TransportControls() {
           className="text-white hover:bg-light-blue/20"
         >
           <SkipForward className="h-4 w-4" />
+        </Button>
+
+        {/* Split button */}
+        <Button
+          variant={selectedClipIds.length === 1 ? "ghost" : "ghost"}
+          size="icon"
+          onClick={handleSplit}
+          disabled={selectedClipIds.length !== 1}
+          className={cn(
+            "text-white",
+            selectedClipIds.length === 1
+              ? "hover:bg-light-blue/20 cursor-pointer"
+              : "opacity-40 cursor-not-allowed"
+          )}
+          title={selectedClipIds.length === 1 
+            ? "Split selected clip at playhead (S)" 
+            : "Select a clip to split"}
+        >
+          <Scissors className="h-4 w-4" />
         </Button>
 
         {/* Audio controls */}

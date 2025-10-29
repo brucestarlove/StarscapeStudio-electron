@@ -11,6 +11,7 @@ class CacheDirs {
     
     this.base = path.join(appDataPath, appName, 'cache');
     this.mediaDir = path.join(this.base, 'media');
+    this.thumbDir = path.join(this.base, 'thumbnails');
     this.previews = path.join(this.base, 'previews');
     this.segments = path.join(this.base, 'segments');
     this.renders = path.join(appDataPath, appName, 'projects');
@@ -22,6 +23,7 @@ class CacheDirs {
    */
   async ensureDirectories() {
     await fs.ensureDir(this.mediaDir);
+    await fs.ensureDir(this.thumbDir);
     await fs.ensureDir(this.previews);
     await fs.ensureDir(this.segments);
     await fs.ensureDir(this.renders);

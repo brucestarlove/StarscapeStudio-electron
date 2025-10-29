@@ -17,7 +17,7 @@ const Card = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "rounded-xl p-lg",
+        "rounded-md p-sm",
         variantClasses[variant],
         className
       )}

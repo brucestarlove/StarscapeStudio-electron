@@ -1,15 +1,17 @@
 import { usePlaybackStore } from "@/store/playbackStore";
+import { useProjectStore } from "@/store/projectStore";
 import { formatTimecode, msToPixels, pixelsToMs, snapToTimeline } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export function Ruler() {
   const { zoom, seek, snapEnabled } = usePlaybackStore();
+  const { getTimelineDuration } = useProjectStore();
 
   // Generate time markers based on zoom level
   const generateMarkers = () => {
     const markers = [];
-    const maxTime = 60000; // 1 minute for MVP
-    
+    const maxTime = getTimelineDuration(); // Dynamic timeline duration
+
     // Determine marker interval based on zoom
     let intervalMs = 1000; // 1 second default
     if (zoom > 0.5) intervalMs = 100; // 100ms for high zoom
@@ -19,7 +21,7 @@ export function Ruler() {
     for (let time = 0; time <= maxTime; time += intervalMs) {
       const x = msToPixels(time, zoom);
       const isMajor = time % (intervalMs * 5) === 0; // Every 5th marker is major
-      
+
       markers.push({
         time,
         x,
@@ -33,18 +35,24 @@ export function Ruler() {
 
   const markers = generateMarkers();
 
+  // Calculate minimum width based on timeline duration
+  const timelineDuration = getTimelineDuration();
+  const minWidth = Math.max(msToPixels(timelineDuration, zoom), 2000);
+
   // Handle ruler click to seek
   const handleRulerClick = (event: React.MouseEvent) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const clickX = event.clientX - rect.left;
     const timeMs = pixelsToMs(clickX, zoom);
-    const snappedTime = snapToTimeline(timeMs, zoom, snapEnabled);
-    seek(Math.max(0, snappedTime));
+    // Don't snap when clicking directly on the ruler - seek to exact position
+    // Snapping only happens when dragging the playhead handle
+    seek(Math.max(0, timeMs));
   };
 
   return (
-    <div 
-      className="h-full relative bg-gradient-to-b from-mid-navy/90 to-dark-navy/90 min-w-[6000px] cursor-pointer"
+    <div
+      className="h-full relative bg-linear-to-b from-mid-navy/90 to-dark-navy/90 cursor-pointer"
+      style={{ minWidth: `${minWidth}px` }}
       onClick={handleRulerClick}
       title="Click to seek to position"
     >
@@ -59,12 +67,12 @@ export function Ruler() {
           <div
             className={cn(
               "w-px",
-              marker.isMajor 
-                ? "h-full bg-light-blue/60 shadow-sm shadow-light-blue/20" 
+              marker.isMajor
+                ? "h-full bg-light-blue/60 shadow-sm shadow-light-blue/20"
                 : "h-1/2 bg-white/40"
             )}
           />
-          
+
           {/* Time label */}
           {marker.isMajor && marker.label && (
             <div className="absolute top-1 left-1 text-caption text-light-blue/90 font-mono font-medium bg-dark-navy/80 px-xs py-xs rounded-sm shadow-sm">
@@ -88,7 +96,7 @@ export function Ruler() {
       )}
 
       {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
     </div>
   );
 }
