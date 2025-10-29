@@ -16,41 +16,24 @@ export function LibraryPane() {
 
   return (
     <>
-      <div className={cn(
-        "h-full bg-mid-navy border-r border-light-blue/20 transition-all duration-300",
-        leftPaneCollapsed ? "w-0 overflow-hidden" : "w-full"
-      )}>
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-md border-b border-white/10">
-            <h2 className="text-h3 font-semibold text-light-blue">Media Library</h2>
-            <button
-              onClick={() => setLeftPaneCollapsed(true)}
-              className="text-white/50 hover:text-white transition-colors"
-              title="Collapse media library pane"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-hidden">
-            <LibraryGrid onUploadClick={() => setShowUploadModal(true)} />
-          </div>
-        </div>
-      </div>
-
-      {/* Collapse indicator */}
-      {leftPaneCollapsed && (
-        <div className="w-4 h-full bg-mid-navy border-r border-light-blue/20 flex items-center justify-center">
+      <div className="h-full flex flex-col bg-mid-navy border-r border-light-blue/20 w-[300px]">
+        {/* Header */}
+        <div className="flex items-center justify-between p-md border-b border-white/10">
+          <h2 className="text-h3 font-semibold text-light-blue">Media Library</h2>
           <button
-            onClick={() => setLeftPaneCollapsed(false)}
-            className="text-white/50 hover:text-white transition-colors rotate-90"
+            onClick={() => setLeftPaneCollapsed(true)}
+            className="text-white/50 hover:text-white transition-colors"
+            title="Collapse media library pane"
           >
-            ›
+            <ChevronLeft className="h-5 w-5" />
           </button>
         </div>
-      )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-hidden">
+          <LibraryGrid onUploadClick={() => setShowUploadModal(true)} />
+        </div>
+      </div>
 
       {/* Upload Modal */}
       <UploadModal 

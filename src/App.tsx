@@ -4,19 +4,22 @@ import { TopBar } from "@/components/TopBar";
 import { LeftRail } from "@/components/LeftRail";
 import { LibraryPane } from "@/components/LibraryPane/LibraryPane";
 import { UtilitiesPane } from "@/components/LibraryPane/UtilitiesPane";
+import { RightRail } from "@/components/RightRail";
+import { TransitionsPane } from "@/components/RightPane/TransitionsPane";
+import { EffectsPane } from "@/components/RightPane/EffectsPane";
 import { Stage } from "@/components/Stage/Stage";
 import { TimelineDock } from "@/components/Timeline/TimelineDock";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { useUiStore } from "@/store/uiStore";
-import { pixelsToMs, snapToTimeline, msToPixels, formatTimecode, resolveClipCollision } from "@/lib/utils";
+import { pixelsToMs, snapToTimeline, msToPixels, formatTimecode, resolveClipCollision, cn } from "@/lib/utils";
 import type { DragItem, Clip } from "@/types";
 import { Play, Music, Image } from "lucide-react";
 import "./globals.css";
 
 function App() {
   const { createClip, moveClip, trimClip, deleteClip, getSelectedClips, getAssetById, getClipsByTrack, shiftClipsRight } = useProjectStore();
-  const { activeLeftPaneTab } = useUiStore();
+  const { activeLeftPaneTab, activeRightPaneTab, leftPaneCollapsed, rightPaneCollapsed, setLeftPaneCollapsed, setRightPaneCollapsed } = useUiStore();
   const [playheadDragStartX, setPlayheadDragStartX] = useState<number | null>(null);
   const [lastDragX, setLastDragX] = useState<number>(0);
   const [clipDragData, setClipDragData] = useState<{ activeId: string; positionMs: number } | null>(null);
@@ -319,7 +322,7 @@ function App() {
     setActiveDragItem(null);
   };
 
-  // Helper to render the active pane
+  // Helper to render the active left pane
   const renderActivePane = () => {
     switch (activeLeftPaneTab) {
       case 'utilities':
@@ -327,6 +330,17 @@ function App() {
       case 'library':
       default:
         return <LibraryPane />;
+    }
+  };
+
+  // Helper to render the active right pane
+  const renderActiveRightPane = () => {
+    switch (activeRightPaneTab) {
+      case 'effects':
+        return <EffectsPane />;
+      case 'transitions':
+      default:
+        return <TransitionsPane />;
     }
   };
 
@@ -427,30 +441,75 @@ function App() {
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
       >
-        {/* Three-row, three-column grid layout */}
-        <div className="h-full grid grid-rows-[60px_1fr_320px] grid-cols-[60px_300px_1fr]">
-          {/* TopBar spans full width */}
-          <div className="col-span-3 row-start-1">
+        {/* Three-row layout with flexible columns */}
+        <div className="h-full flex flex-col">
+          {/* TopBar - fixed height */}
+          <div className="h-[60px]">
             <TopBar />
           </div>
 
-          {/* LeftRail */}
-          <div className="col-start-1 row-start-2">
-            <LeftRail />
+          {/* Middle section - main content area */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* LeftRail - fixed width */}
+            <div className="w-[60px] shrink-0">
+              <LeftRail />
+            </div>
+
+            {/* Left Panes Container - collapsible from left */}
+            <div className={cn(
+              "shrink-0 transition-all duration-300 overflow-hidden",
+              leftPaneCollapsed ? "w-0" : "w-[300px]"
+            )}>
+              {renderActivePane()}
+            </div>
+
+            {/* Collapsed left pane indicator */}
+            {leftPaneCollapsed && (
+              <div className="w-1 shrink-0 bg-mid-navy border-r border-light-blue/20 flex items-center justify-center relative group">
+                <button
+                  onClick={() => setLeftPaneCollapsed(false)}
+                  className="absolute inset-0 flex items-center justify-center text-white/30 hover:text-white hover:bg-light-blue/10 transition-all"
+                  title="Expand left pane"
+                >
+                  <span className="transform rotate-90 text-xl">›</span>
+                </button>
+              </div>
+            )}
+
+            {/* Stage - center responsive area */}
+            <div className="flex-1 min-w-0">
+              <Stage />
+            </div>
+
+            {/* Collapsed right pane indicator */}
+            {rightPaneCollapsed && (
+              <div className="w-1 shrink-0 bg-mid-navy border-l border-light-blue/20 flex items-center justify-center relative group">
+                <button
+                  onClick={() => setRightPaneCollapsed(false)}
+                  className="absolute inset-0 flex items-center justify-center text-white/30 hover:text-white hover:bg-light-blue/10 transition-all"
+                  title="Expand right pane"
+                >
+                  <span className="transform rotate-90 text-xl">‹</span>
+                </button>
+              </div>
+            )}
+
+            {/* Right Panes Container - collapsible from right */}
+            <div className={cn(
+              "shrink-0 transition-all duration-300 overflow-hidden",
+              rightPaneCollapsed ? "w-0" : "w-[300px]"
+            )}>
+              {renderActiveRightPane()}
+            </div>
+
+            {/* RightRail - fixed width */}
+            <div className="w-[60px] shrink-0">
+              <RightRail />
+            </div>
           </div>
 
-          {/* LibraryPane (collapsible) - renders based on active tab */}
-          <div className="col-start-2 row-start-2">
-            {renderActivePane()}
-          </div>
-
-          {/* Stage */}
-          <div className="col-start-3 row-start-2">
-            <Stage />
-          </div>
-
-          {/* TimelineDock spans full width */}
-          <div className="col-span-3 row-start-3">
+          {/* TimelineDock - fixed height */}
+          <div className="h-[320px]">
             <TimelineDock />
           </div>
         </div>
