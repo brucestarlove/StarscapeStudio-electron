@@ -235,12 +235,25 @@ export class AudioManager {
     this.pause();
     this.stopSyncLoop();
 
+    // Clear all audio elements
     for (const { element } of this.audioElements.values()) {
       element.pause();
       element.src = '';
+      element.load(); // Force unload
     }
 
     this.audioElements.clear();
+    
+    // Clear video element reference and ensure it's cleaned
+    if (this.videoElement) {
+      this.videoElement.pause();
+      this.videoElement.removeAttribute('src');
+      this.videoElement.load(); // Force unload
+      this.videoElement = null;
+    }
+    
+    // Reset internal state
+    this.isPlaying = false;
   }
 
   /**

@@ -5,6 +5,7 @@ import type { Asset, Clip, Track, CanvasNode, ProjectState } from '@/types';
 import { generateId } from '@/lib/utils';
 import { ingestFiles, type IngestResult } from '@/lib/bindings';
 import { audioManager } from '@/lib/AudioManager';
+import { usePlaybackStore } from '@/store/playbackStore';
 
 interface ProjectStore extends ProjectState {
   // Asset actions
@@ -486,10 +487,23 @@ export const useProjectStore = create<ProjectStore>()(
       },
       
       clearProject: () => {
+        // Stop playback and reset timeline position
+        const playbackState = usePlaybackStore.getState();
+        playbackState.pause();
+        playbackState.seek(0);
+        
         // Clear all audio elements from the AudioManager
         audioManager.clear();
-        // Reset project state
-        set(() => ({ ...initialProjectState }));
+        
+        // Reset project state - generate new track IDs to ensure complete cleanup
+        set(() => ({
+          ...initialProjectState,
+          id: generateId(),
+          tracks: initialProjectState.tracks.map(track => ({
+            ...track,
+            id: generateId(),
+          })),
+        }));
       },
       
       // Derived state getters

@@ -32,50 +32,70 @@ function AssetCard({ asset, onDoubleClick }: AssetCardProps) {
     }
   };
 
+  const getAssetColor = (type: Asset['type']) => {
+    switch (type) {
+      case 'video': return 'from-purple-500/20 to-blue-500/20';
+      case 'audio': return 'from-pink-500/20 to-purple-500/20';
+      case 'image': return 'from-blue-500/20 to-cyan-500/20';
+      default: return 'from-purple-500/20 to-blue-500/20';
+    }
+  };
+
   const Icon = getAssetIcon(asset.type);
+  const gradientColor = getAssetColor(asset.type);
 
   return (
     <Card
       ref={setNodeRef}
       variant="dark-glass"
       className={cn(
-        "cursor-pointer transition-all duration-200 hover:shadow-elevated",
-        isDragging && "opacity-50"
+        "group cursor-grab active:cursor-grabbing transition-all duration-200 overflow-hidden p-0",
+        "hover:scale-[1.02] hover:shadow-elevated hover:border-light-blue/40",
+        isDragging && "opacity-50 scale-95"
       )}
       onDoubleClick={onDoubleClick}
       {...listeners}
       {...attributes}
     >
-      <CardContent className="p-md">
-        <div className="aspect-video bg-gradient-purple-blue rounded-md flex items-center justify-center mb-sm overflow-hidden relative">
-          {asset.thumbnailUrl ? (
-            <img 
-              src={asset.thumbnailUrl} 
-              alt={asset.name}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                // Fallback to icon if thumbnail fails to load
-                e.currentTarget.style.display = 'none';
-              }}
-            />
-          ) : (
-            <Icon className="h-8 w-8 text-white" />
-          )}
-          {/* Type badge overlay */}
-          <div className="absolute top-1 right-1 bg-black/60 rounded px-1 py-0.5">
-            <Icon className="h-3 w-3 text-white" />
-          </div>
-        </div>
+      {/* Thumbnail/Preview Area - Top Half */}
+      <div className={cn(
+        "aspect-video flex items-center justify-center overflow-hidden relative",
+        "bg-gradient-to-br",
+        gradientColor
+      )}>
+        {asset.thumbnailUrl ? (
+          <img 
+            src={asset.thumbnailUrl} 
+            alt={asset.name}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={(e) => {
+              // Fallback to icon if thumbnail fails to load
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        ) : (
+          <Icon className="h-10 w-10 text-white/70 group-hover:text-white group-hover:scale-110 transition-all duration-200" />
+        )}
+      </div>
+      
+      {/* Asset Info - Bottom Half */}
+      <CardContent className="p-2 space-y-1.5">
+        <h3 
+          className="text-xs font-medium text-white truncate leading-tight group-hover:text-light-blue transition-colors" 
+          title={asset.name}
+        >
+          {asset.name}
+        </h3>
         
-        <div className="space-y-xs">
-          <h3 className="text-body-small font-medium text-white truncate" title={asset.name}>
-            {asset.name}
-          </h3>
-          
-          <div className="flex items-center justify-between text-caption text-white/70">
-            <span className="capitalize">{asset.type}</span>
-            <span>{formatTimecode(asset.duration)}</span>
-          </div>
+        <div className="flex items-center gap-1.5">
+          {/* Type pill */}
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/10 text-white/80 capitalize">
+            {asset.type}
+          </span>
+          {/* Duration */}
+          <span className="text-[10px] text-white/50 font-mono">
+            {formatTimecode(asset.duration)}
+          </span>
         </div>
       </CardContent>
     </Card>

@@ -39,10 +39,22 @@ export function Stage() {
     };
   }, []);
 
-  // Load video source when asset changes
+  // Load video source when asset changes, or clear it when no asset
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !visibleAsset) return;
+    if (!video) return;
+
+    // If no visible asset, clear the video source completely
+    if (!visibleAsset) {
+      if (loadedAssetIdRef.current !== null) {
+        console.log('Clearing video source (no visible asset)');
+        video.pause();
+        video.removeAttribute('src');
+        video.load(); // This clears the video element
+        loadedAssetIdRef.current = null;
+      }
+      return;
+    }
 
     // Only update source if the asset actually changed
     if (loadedAssetIdRef.current !== visibleAsset.id) {
