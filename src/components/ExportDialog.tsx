@@ -75,8 +75,9 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
       
       const backendTracks: Record<string, any> = {};
       tracks.forEach((track, index) => {
-        // For MVP, first video track is 'main', others are overlays
-        const role = index === 0 && track.type === 'video' ? 'main' : 'overlay';
+        // All video tracks are treated as 'main' for export
+        // Audio tracks can be 'overlay' (they'll be mixed together)
+        const role = track.type === 'video' ? 'main' : 'overlay';
         
         backendTracks[track.id] = {
           id: track.id,

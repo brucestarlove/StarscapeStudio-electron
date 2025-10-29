@@ -26,6 +26,9 @@ export class CanvasCompositor {
   private currentTimeMs: number = 0;
   private isPlaying: boolean = false;
 
+  // Image cache - keep loaded images in memory
+  private imageCache: Map<string, HTMLImageElement> = new Map();
+
   /**
    * Initialize the compositor with a canvas element
    */
@@ -178,24 +181,27 @@ export class CanvasCompositor {
     
     const video = videoPoolManager.getVideo(asset.id);
     if (!video) {
-      console.warn(`Video not found in pool: ${asset.id}`);
-      return;
+      return; // Video not loaded yet
     }
     
-    if (video.readyState < 2) {
-      console.warn(`Video not ready (readyState=${video.readyState}): ${asset.id}`);
-      return; // Need HAVE_CURRENT_DATA
+    // For drawing, we can accept readyState >= 1 (HAVE_METADATA)
+    // The browser will show the poster frame or first frame
+    if (video.readyState < 1) {
+      return; // Not ready yet
     }
     
     // Draw video frame to canvas
     try {
-      this.ctx.drawImage(
-        video,
-        0, 0, video.videoWidth, video.videoHeight, // Source rectangle
-        0, 0, this.canvas.width, this.canvas.height // Destination rectangle
-      );
+      // If video has dimensions, draw it
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        this.ctx.drawImage(
+          video,
+          0, 0, video.videoWidth, video.videoHeight, // Source rectangle
+          0, 0, this.canvas.width, this.canvas.height // Destination rectangle
+        );
+      }
     } catch (error) {
-      console.error(`Error drawing video frame for ${asset.id}:`, error);
+      // Silently ignore - video might not be ready yet
     }
   }
 
@@ -205,10 +211,24 @@ export class CanvasCompositor {
   private renderImage(clip: Clip, asset: Asset): void {
     if (!this.ctx || !this.canvas) return;
     
-    // Create image element if not cached
-    const img = new Image();
-    img.src = asset.url;
+    // Get or create cached image
+    let img = this.imageCache.get(asset.id);
     
+    if (!img) {
+      // Create new image and cache it
+      img = new Image();
+      img.src = asset.url;
+      this.imageCache.set(asset.id, img);
+      
+      // Once loaded, trigger a re-render if not playing
+      img.onload = () => {
+        if (!this.isPlaying && this.canvas && this.ctx) {
+          this.renderFrame();
+        }
+      };
+    }
+    
+    // Only draw if image is fully loaded
     if (img.complete && img.naturalWidth > 0) {
       try {
         this.ctx.drawImage(
@@ -248,26 +268,20 @@ export class CanvasCompositor {
             const timeDiff = Math.abs(video.currentTime - sourceTimeSeconds);
             if (timeDiff > 0.1) {
               video.currentTime = sourceTimeSeconds;
-              console.log(`📍 Seeking video ${asset.id} to ${sourceTimeSeconds.toFixed(2)}s`);
             }
             
             // Handle play/pause based on current state
-            if (this.isPlaying && video.paused && video.readyState >= 2) {
-              console.log(`▶️  Playing video ${asset.id}`);
+            // Try to play even at readyState 1 - browser will buffer as needed
+            if (this.isPlaying && video.paused) {
               video.play().catch(err => {
                 if (err.name !== 'AbortError') {
                   console.error(`Play error for ${asset.id}:`, err);
                 }
               });
             } else if (!this.isPlaying && !video.paused) {
-              console.log(`⏸️  Pausing video ${asset.id}`);
               video.pause();
             }
-          } else {
-            console.warn(`⏳ Video ${asset.id} not ready yet (readyState=${video.readyState})`);
           }
-        } else {
-          console.warn(`❌ Video ${asset.id} not found in pool`);
         }
       }
     }
@@ -285,6 +299,7 @@ export class CanvasCompositor {
     this.canvas = null;
     this.ctx = null;
     this.currentClips = [];
+    this.imageCache.clear();
   }
 }
 

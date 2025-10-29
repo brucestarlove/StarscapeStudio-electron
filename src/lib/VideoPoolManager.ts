@@ -40,7 +40,11 @@ export class VideoPoolManager {
       document.body.appendChild(video);
 
       const handleLoad = () => {
-        console.log(`✅ Video loaded: ${asset.name} (${asset.id})`);
+        console.log(`✅ Video metadata loaded: ${asset.name} (${asset.id})`);
+        // Set currentTime to 0 to trigger data loading
+        video.currentTime = 0;
+        
+        // Store video immediately so it can be used
         this.videos.set(asset.id, video);
         this.loadingPromises.delete(asset.id);
         cleanup();

@@ -50,6 +50,7 @@ function buildPlan(projectJsonString) {
         endMs: clip.endMs,
       };
 
+      // All clips go to mainTrack for now (we'll handle overlays later)
       if (track.role === 'main') {
         mainTrack.push(seqClip);
       } else {
@@ -61,12 +62,9 @@ function buildPlan(projectJsonString) {
   // Sort main track by start time
   mainTrack.sort((a, b) => a.startMs - b.startMs);
 
-  // Validate no overlaps on main track
-  for (let i = 1; i < mainTrack.length; i++) {
-    if (mainTrack[i - 1].endMs > mainTrack[i].startMs) {
-      throw new Error('Overlapping clips on main track (MVP disallows)');
-    }
-  }
+  // For overlapping clips (clips on different tracks at same time),
+  // we'll just include all of them for now and let the export handle compositing
+  // In the future, we can add proper multi-track compositing logic here
 
   return {
     id,

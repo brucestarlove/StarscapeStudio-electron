@@ -6,26 +6,59 @@ const path = require('path');
  * Execute export job with progress tracking
  */
 async function executeExportJob(plan, settings, cache, mainWindow, trackProcessFn) {
-  const total = plan.mainTrack.length + 2; // segments + concat + finalize
+  // Calculate total steps: clips + gaps + concat + finalize
+  const gapCount = plan.mainTrack.length > 0 ? plan.mainTrack.length - 1 : 0;
+  const total = plan.mainTrack.length + gapCount + 2;
   let current = 0;
 
   const segmentPaths = [];
+  let segmentIndex = 0;
 
-  // Step 1: Trim each clip to segment files
+  // Step 1: Process each clip and gaps between them
   for (let idx = 0; idx < plan.mainTrack.length; idx++) {
     const clip = plan.mainTrack[idx];
     
-    // Send progress event
+    // Add gap before this clip (if not the first clip)
+    if (idx > 0) {
+      const prevClip = plan.mainTrack[idx - 1];
+      const gapDurationMs = clip.startMs - prevClip.endMs;
+      
+      if (gapDurationMs > 0) {
+        // Try to create black segment for gap
+        try {
+          // Send progress event for gap
+          if (mainWindow) {
+            mainWindow.webContents.send('export-progress', {
+              phase: 'segment',
+              current,
+              total,
+              message: `Creating gap ${idx}/${gapCount}`,
+            });
+          }
+
+          const gapPath = cache.segmentPath(segmentIndex++);
+          await createBlackSegment(gapPath, gapDurationMs / 1000, trackProcessFn);
+          segmentPaths.push(gapPath);
+          current++;
+        } catch (err) {
+          console.warn(`Failed to create gap segment: ${err.message}`);
+          console.warn(`Skipping ${gapDurationMs}ms gap - clips will be concatenated directly`);
+          // Continue without the gap - clips will just play back-to-back
+        }
+      }
+    }
+    
+    // Send progress event for clip
     if (mainWindow) {
       mainWindow.webContents.send('export-progress', {
         phase: 'segment',
         current,
         total,
-        message: `Trimming clip ${idx + 1}/${plan.mainTrack.length}`,
+        message: `Processing clip ${idx + 1}/${plan.mainTrack.length}`,
       });
     }
 
-    const segPath = cache.segmentPath(idx);
+    const segPath = cache.segmentPath(segmentIndex++);
     const startSec = clip.inMs / 1000;
     const durationSec = (clip.outMs - clip.inMs) / 1000;
 
@@ -86,16 +119,79 @@ async function executeExportJob(plan, settings, cache, mainWindow, trackProcessF
 
   // Get output file stats
   const stats = await fs.stat(outPath);
-  const durationMs = plan.mainTrack.reduce(
-    (sum, clip) => sum + (clip.outMs - clip.inMs),
-    0
-  );
+  
+  // Calculate total duration: from first clip start to last clip end
+  const firstClipStart = plan.mainTrack.length > 0 ? plan.mainTrack[0].startMs : 0;
+  const lastClipEnd = plan.mainTrack.length > 0 ? plan.mainTrack[plan.mainTrack.length - 1].endMs : 0;
+  const durationMs = lastClipEnd - firstClipStart;
 
   return {
     path: `file://${outPath}`,
     duration_ms: durationMs,
     size_bytes: stats.size,
   };
+}
+
+/**
+ * Create a black video segment (for gaps)
+ * If lavfi is not available, this will fail and we'll skip gaps
+ */
+async function createBlackSegment(outputPath, durationSec, trackProcessFn) {
+  const path = require('path');
+  const os = require('os');
+  
+  // Try multiple approaches in order of compatibility
+  const approaches = [
+    // Approach 1: Simple color source (most compatible)
+    () => {
+      return new Promise((resolve, reject) => {
+        const command = ffmpeg();
+        
+        // Build raw ffmpeg command for maximum compatibility
+        command
+          .input('color=black:s=1920x1080:r=30')
+          .inputFormat('lavfi')
+          .input('anullsrc=r=48000:cl=stereo')
+          .inputFormat('lavfi')
+          .duration(durationSec)
+          .videoCodec('libx264')
+          .audioCodec('aac')
+          .outputOptions([
+            '-preset', 'ultrafast',
+            '-crf', '23',
+            '-pix_fmt', 'yuv420p',
+          ]);
+
+        const ffmpegProcess = command
+          .output(outputPath)
+          .on('end', () => {
+            if (trackProcessFn) trackProcessFn(ffmpegProcess);
+            resolve();
+          })
+          .on('error', (err) => {
+            if (trackProcessFn) trackProcessFn(ffmpegProcess);
+            reject(err);
+          })
+          .run();
+          
+        if (trackProcessFn) trackProcessFn(ffmpegProcess);
+      });
+    },
+  ];
+
+  // Try each approach
+  for (const approach of approaches) {
+    try {
+      await approach();
+      return; // Success!
+    } catch (err) {
+      console.log('Black segment approach failed, will try next...');
+      // Continue to next approach
+    }
+  }
+  
+  // All approaches failed
+  throw new Error('Failed to create black segment - lavfi not available in FFmpeg build');
 }
 
 /**
