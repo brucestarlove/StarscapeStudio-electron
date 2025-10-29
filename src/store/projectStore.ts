@@ -43,6 +43,7 @@ interface ProjectStore extends ProjectState {
   getClipsByTrack: (trackId: string) => Clip[];
   getSelectedClips: () => Clip[];
   getAssetById: (assetId: string) => Asset | undefined;
+  getTimelineDuration: () => number;
 }
 
 const initialProjectState: ProjectState = {
@@ -166,8 +167,9 @@ export const useProjectStore = create<ProjectStore>()(
             return {
               id: result.asset_id,
               type: assetType,
-              name: result.file_path.split('/').pop() || 'Unknown',
+              name: result.original_file_name, // Use original file name
               url: `media://${result.file_path}`, // Use custom media:// protocol for local files
+              thumbnailUrl: result.thumbnail_path ? `media://${result.thumbnail_path}` : undefined,
               duration: result.metadata.duration_ms,
               metadata: {
                 width: result.metadata.width || 0,
@@ -512,6 +514,21 @@ export const useProjectStore = create<ProjectStore>()(
       getAssetById: (assetId: string) => {
         const state = get();
         return state.assets.find((asset: Asset) => asset.id === assetId);
+      },
+      
+      getTimelineDuration: () => {
+        const state = get();
+        let maxEndMs = 0;
+        
+        // Find the latest end time across all clips in all tracks
+        Object.values(state.clips).forEach((clip: Clip) => {
+          if (clip.endMs > maxEndMs) {
+            maxEndMs = clip.endMs;
+          }
+        });
+        
+        // Return at least 10 seconds (10000ms) for empty timeline
+        return Math.max(maxEndMs, 10000);
       },
     })),
     {

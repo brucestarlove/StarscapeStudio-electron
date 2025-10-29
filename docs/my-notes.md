@@ -21,8 +21,19 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 [x] allow renaming of file on export
 [x] fix mismatch scroll in the timeline between track headers and the tracks
 [x] 2nd video track
-[ ] dragging
+[ ] better dragging
+[ ] split
 [ ] import asset with the original name
 [ ] right click menu to rename asset
 [ ] right pane with edit features
 [ ] 
+
+
+## extra
+[ ] hide scrolllbars unless actively scrolling
+[ ] AI transcription gen, asset gen, 11Labs narrating transcriptions gen
+
+## very extra
+[ ] cosmic asset generation specifically
+[ ] integrate with other Starscape
+[ ]

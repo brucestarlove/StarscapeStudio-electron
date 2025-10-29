@@ -47,12 +47,28 @@ function AssetCard({ asset, onDoubleClick }: AssetCardProps) {
       {...attributes}
     >
       <CardContent className="p-md">
-        <div className="aspect-video bg-gradient-purple-blue rounded-md flex items-center justify-center mb-sm">
-          <Icon className="h-8 w-8 text-white" />
+        <div className="aspect-video bg-gradient-purple-blue rounded-md flex items-center justify-center mb-sm overflow-hidden relative">
+          {asset.thumbnailUrl ? (
+            <img 
+              src={asset.thumbnailUrl} 
+              alt={asset.name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Fallback to icon if thumbnail fails to load
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : (
+            <Icon className="h-8 w-8 text-white" />
+          )}
+          {/* Type badge overlay */}
+          <div className="absolute top-1 right-1 bg-black/60 rounded px-1 py-0.5">
+            <Icon className="h-3 w-3 text-white" />
+          </div>
         </div>
         
         <div className="space-y-xs">
-          <h3 className="text-body-small font-medium text-white truncate">
+          <h3 className="text-body-small font-medium text-white truncate" title={asset.name}>
             {asset.name}
           </h3>
           

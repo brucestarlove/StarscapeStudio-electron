@@ -1,14 +1,16 @@
 import { usePlaybackStore } from "@/store/playbackStore";
+import { useProjectStore } from "@/store/projectStore";
 import { formatTimecode, msToPixels, pixelsToMs, snapToTimeline } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export function Ruler() {
   const { zoom, seek, snapEnabled } = usePlaybackStore();
+  const { getTimelineDuration } = useProjectStore();
 
   // Generate time markers based on zoom level
   const generateMarkers = () => {
     const markers = [];
-    const maxTime = 60000; // 1 minute for MVP
+    const maxTime = getTimelineDuration(); // Dynamic timeline duration
     
     // Determine marker interval based on zoom
     let intervalMs = 1000; // 1 second default
@@ -32,6 +34,10 @@ export function Ruler() {
   };
 
   const markers = generateMarkers();
+  
+  // Calculate minimum width based on timeline duration
+  const timelineDuration = getTimelineDuration();
+  const minWidth = Math.max(msToPixels(timelineDuration, zoom), 2000);
 
   // Handle ruler click to seek
   const handleRulerClick = (event: React.MouseEvent) => {
@@ -44,7 +50,8 @@ export function Ruler() {
 
   return (
     <div 
-      className="h-full relative bg-gradient-to-b from-mid-navy/90 to-dark-navy/90 min-w-[6000px] cursor-pointer"
+      className="h-full relative bg-gradient-to-b from-mid-navy/90 to-dark-navy/90 cursor-pointer"
+      style={{ minWidth: `${minWidth}px` }}
       onClick={handleRulerClick}
       title="Click to seek to position"
     >

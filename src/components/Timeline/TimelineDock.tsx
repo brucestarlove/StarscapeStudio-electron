@@ -4,9 +4,16 @@ import { Playhead } from "./Playhead";
 import { TransportControls } from "../Transport/TransportControls";
 import { TrackHeader } from "./TrackHeader";
 import { useProjectStore } from "@/store/projectStore";
+import { usePlaybackStore } from "@/store/playbackStore";
+import { msToPixels } from "@/lib/utils";
 
 export function TimelineDock() {
-  const { tracks } = useProjectStore();
+  const { tracks, getTimelineDuration } = useProjectStore();
+  const { zoom } = usePlaybackStore();
+  
+  // Calculate minimum width based on timeline duration
+  const timelineDuration = getTimelineDuration();
+  const minWidth = Math.max(msToPixels(timelineDuration, zoom), 2000); // At least 2000px
 
   return (
     <div className="h-full bg-gradient-to-b from-dark-navy to-mid-navy border-t border-light-blue/30 shadow-lg flex flex-col">
@@ -32,8 +39,8 @@ export function TimelineDock() {
             ))}
           </div>
 
-          {/* Scrollable track content area */}
-          <div className="relative min-w-[6000px] flex-1">
+          {/* Scrollable track content area - width based on timeline duration */}
+          <div className="relative flex-1" style={{ minWidth: `${minWidth}px` }}>
             {/* Playhead - positioned absolutely in this container */}
             <Playhead />
             
