@@ -59,6 +59,14 @@ const initialProjectState: ProjectState = {
     },
     {
       id: 'track-2',
+      name: 'Video Track 2',
+      type: 'video',
+      clips: [],
+      locked: false,
+      visible: true,
+    },
+    {
+      id: 'track-3',
       name: 'Audio Track 1',
       type: 'audio',
       clips: [],

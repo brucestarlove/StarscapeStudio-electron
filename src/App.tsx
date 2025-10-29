@@ -17,6 +17,7 @@ function App() {
   const { createClip, moveClip, trimClip } = useProjectStore();
   const { activeLeftPaneTab } = useUiStore();
   const [playheadDragStartX, setPlayheadDragStartX] = useState<number | null>(null);
+  const [clipDragData, setClipDragData] = useState<{ activeId: string; positionMs: number } | null>(null);
 
   // Prevent default browser behavior on file drag/drop (avoids navigation)
   useEffect(() => {
@@ -66,6 +67,31 @@ function App() {
       
       // Update playhead position in real-time (no snapping during drag)
       seek(newTimeMs);
+    } else if (dragItem.type === 'clip' || dragItem.type === 'asset') {
+      // For clips/assets being dragged, calculate the position in milliseconds
+      const { zoom } = usePlaybackStore.getState();
+      const tracksScrollContainer = document.getElementById('tracks-scroll');
+      
+      if (tracksScrollContainer) {
+        // Get the scroll offset to account for horizontal scrolling
+        const scrollLeft = tracksScrollContainer.scrollLeft;
+        
+        // Get the mouse position relative to the viewport
+        const containerRect = tracksScrollContainer.getBoundingClientRect();
+        
+        // Calculate position in the timeline: 
+        // The track headers are 224px wide (w-56 = 14rem ≈ 224px)
+        // So we need to subtract that offset
+        const positionInTimeline = scrollLeft + (delta.x - (containerRect.left - scrollLeft));
+        
+        // Convert pixels to milliseconds
+        const positionMs = Math.max(0, pixelsToMs(positionInTimeline, zoom));
+        
+        setClipDragData({
+          activeId: active.id as string,
+          positionMs
+        });
+      }
     }
   };
 
@@ -87,19 +113,27 @@ function App() {
 
     if (!over) return;
 
-    const dropResult = over.data.current as { trackId: string; positionMs: number };
+    // Use the tracked position from drag movement, or fall back to over data
+    const positionMs = clipDragData?.positionMs ?? (over.data.current as { trackId: string; positionMs: number }).positionMs ?? 0;
+    const dropResult = { 
+      trackId: over.data.current?.trackId,
+      positionMs 
+    };
 
-    if (dragItem.type === 'asset' && dropResult) {
+    if (dragItem.type === 'asset' && dropResult.trackId) {
       // Create new clip from asset
-      createClip(dragItem.id, dropResult.trackId, dropResult.positionMs);
-    } else if (dragItem.type === 'clip' && dropResult) {
+      createClip(dragItem.id, dropResult.trackId, positionMs);
+    } else if (dragItem.type === 'clip' && dropResult.trackId) {
       // Move existing clip
-      moveClip(dragItem.id, dropResult.trackId, dropResult.positionMs);
+      moveClip(dragItem.id, dropResult.trackId, positionMs);
     } else if (dragItem.type === 'trim-handle' && dragItem.clipId) {
       // Handle trim operation
       const deltaMs = dropResult.positionMs - (dragItem.side === 'left' ? 0 : 1000); // Simplified
       trimClip(dragItem.clipId, dragItem.side!, deltaMs);
     }
+    
+    // Clear drag data
+    setClipDragData(null);
   };
 
   // Helper to render the active pane
