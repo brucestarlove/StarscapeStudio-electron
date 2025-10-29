@@ -15,25 +15,27 @@ export function Playhead() {
 
   const playheadX = msToPixels(currentTimeMs, zoom);
 
-
   return (
     <div
-      ref={setNodeRef}
-      className={cn(
-        "absolute top-0 bottom-0 w-px bg-gradient-cyan-vibrant z-tooltip pointer-events-none",
-        isDragging && "pointer-events-auto"
-      )}
+      className="absolute top-0 bottom-0 w-px z-50 pointer-events-none"
       style={{
         left: `${playheadX}px`,
       }}
-      {...listeners}
-      {...attributes}
     >
-      {/* Diamond handle */}
-      <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-gradient-cyan-vibrant rotate-45 border border-white/20" />
-      
+      {/* Diamond handle - always visible and draggable */}
+      <div
+        ref={setNodeRef}
+        className={cn(
+          "absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-cyan-vibrant rotate-45 border border-white/20 cursor-col-resize pointer-events-auto shadow-lg",
+          isDragging && "scale-125"
+        )}
+        {...listeners}
+        {...attributes}
+        title="Drag to seek through timeline"
+      />
+
       {/* Line */}
-      <div className="w-full h-full bg-gradient-cyan-vibrant" />
+      <div className="w-full h-full bg-gradient-cyan-vibrant shadow-glow-cyan pointer-events-none" />
     </div>
   );
 }

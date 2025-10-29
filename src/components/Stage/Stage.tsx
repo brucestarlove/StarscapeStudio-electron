@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { Play, Music } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
@@ -73,31 +72,44 @@ export function Stage() {
     }
   }, [sourceTimeMs, visibleClip]);
 
-  // Update playback store as video plays
+  // Update playback store as video plays - use requestAnimationFrame for smoother updates
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !visibleClip) return;
+    if (!video || !visibleClip || !playing) return;
 
-    const handleTimeUpdate = () => {
-      // Don't update store if we're programmatically seeking
-      if (isSeekingRef.current || !playing) {
-        console.log('Skipping timeupdate:', { isSeekingRef: isSeekingRef.current, playing });
+    let animationFrameId: number;
+    let lastUpdateTime = 0;
+
+    const updatePlaybackPosition = () => {
+      if (!video || !visibleClip || isSeekingRef.current) {
+        animationFrameId = requestAnimationFrame(updatePlaybackPosition);
         return;
       }
-      
+
+      const now = performance.now();
+      // Throttle updates to ~60fps (every ~16ms)
+      if (now - lastUpdateTime < 16) {
+        animationFrameId = requestAnimationFrame(updatePlaybackPosition);
+        return;
+      }
+      lastUpdateTime = now;
+
       // Calculate timeline time from video time
       const videoTimeMs = video.currentTime * 1000;
       const timelineTimeMs = (videoTimeMs - visibleClip.trimStartMs) + visibleClip.startMs;
       
-      console.log('Timeupdate:', { videoTimeMs, timelineTimeMs, trimStart: visibleClip.trimStartMs, clipStart: visibleClip.startMs });
-      
       // Update store with the current playback position
       seek(timelineTimeMs);
+      
+      animationFrameId = requestAnimationFrame(updatePlaybackPosition);
     };
 
-    video.addEventListener('timeupdate', handleTimeUpdate);
+    animationFrameId = requestAnimationFrame(updatePlaybackPosition);
+
     return () => {
-      video.removeEventListener('timeupdate', handleTimeUpdate);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
   }, [visibleClip, playing, seek]);
 

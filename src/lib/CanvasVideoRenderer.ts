@@ -154,7 +154,7 @@ export class CanvasVideoRenderer {
    * Render a single layer (video, image, or audio visualization)
    */
   private async renderLayer(layer: RenderLayer): Promise<void> {
-    const { asset, clip, canvasNode, sourceTimeMs } = layer;
+    const { asset, canvasNode, sourceTimeMs } = layer;
 
     // Save canvas state for transformations
     this.ctx.save();
@@ -182,7 +182,7 @@ export class CanvasVideoRenderer {
       } else if (asset.type === 'image') {
         await this.renderImageLayer(asset);
       } else if (asset.type === 'audio') {
-        this.renderAudioVisualization(asset);
+        this.renderAudioVisualization();
       }
     } catch (error) {
       console.error(`Error rendering layer for asset ${asset.name}:`, error);
@@ -260,7 +260,7 @@ export class CanvasVideoRenderer {
   /**
    * Render audio visualization placeholder
    */
-  private renderAudioVisualization(asset: Asset): void {
+  private renderAudioVisualization(): void {
     // Simple audio visualization placeholder
     const size = 100;
     

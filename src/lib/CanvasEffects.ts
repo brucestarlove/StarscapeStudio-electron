@@ -285,8 +285,6 @@ export function applyChromaticAberration(
   sourceCanvas: HTMLCanvasElement,
   intensity: number = 5
 ): void {
-  const imageData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
-  const data = imageData.data;
   const width = sourceCanvas.width;
   const height = sourceCanvas.height;
   

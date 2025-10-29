@@ -71,7 +71,7 @@ export interface ExportSettings {
 
 // Drag and drop types
 export interface DragItem {
-  type: 'asset' | 'clip' | 'trim-handle';
+  type: 'asset' | 'clip' | 'trim-handle' | 'playhead';
   id: string;
   assetId?: string;
   clipId?: string;
