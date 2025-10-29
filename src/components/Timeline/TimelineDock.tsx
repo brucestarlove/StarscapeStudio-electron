@@ -19,6 +19,9 @@ export function TimelineDock() {
     if (!container) return;
 
     const handleWheel = (event: WheelEvent) => {
+      // Only zoom if Shift is held
+      if (!event.shiftKey) return;
+
       // Only zoom if scroll is vertical (deltaY)
       if (Math.abs(event.deltaY) === 0) return;
 
@@ -28,10 +31,10 @@ export function TimelineDock() {
       // Zoom with smaller increments (0.02 per scroll event)
       const zoomIncrement = 0.02;
       if (event.deltaY < 0) {
-        // Scroll up = zoom in
+        // Scroll up + Shift = zoom in
         setZoom(zoom + zoomIncrement);
       } else {
-        // Scroll down = zoom out
+        // Scroll down + Shift = zoom out
         setZoom(zoom - zoomIncrement);
       }
     };
