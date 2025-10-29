@@ -147,3 +147,19 @@ This gives a professional video editor feel where scrubbing always pauses playba
 2. **`src/components/Timeline/Ruler.tsx`** - Added `pause()` call when clicking the ruler to seek
 
 Now when you're playing and you want to jump to a different time or scrub through, it will automatically pause so you can see exactly where you're going!
+
+---
+
+Now the playback will automatically pause whenever the user:
+
+1. **Drags the playhead** - When you grab the diamond handle at the top of the playhead and drag it
+2. **Clicks on the ruler** - When you click anywhere on the ruler to jump to a specific time
+
+This gives a professional video editor feel where scrubbing always pauses playback automatically.
+
+## Changes Made:
+
+1. **`src/App.tsx`** - Added `pause()` call when playhead drag starts
+2. **`src/components/Timeline/Ruler.tsx`** - Added `pause()` call when clicking the ruler to seek
+
+Now when you're playing and you want to jump to a different time or scrub through, it will automatically pause so you can see exactly where you're going!

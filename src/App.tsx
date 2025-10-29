@@ -45,6 +45,32 @@ function App() {
     };
   }, []);
 
+  // Handle spacebar for play/pause toggle
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        // Prevent spacebar from triggering when typing in input fields
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return;
+        }
+
+        e.preventDefault();
+        const { playing, play, pause } = usePlaybackStore.getState();
+        if (playing) {
+          pause();
+        } else {
+          play();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   // Handle Delete key for deleting selected clips
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
