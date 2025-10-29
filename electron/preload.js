@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Save blob to file
   saveBlobToFile: (blobData, filePath) => ipcRenderer.invoke('save-blob-to-file', blobData, filePath),
   
+  // Reveal file in Finder/Explorer
+  revealInFinder: (filePath) => ipcRenderer.invoke('reveal-in-finder', filePath),
+  
   // Screen recording
   listCaptureDevices: () => ipcRenderer.invoke('list-capture-devices'),
   startScreenRecord: (settings) => ipcRenderer.invoke('start-screen-record', settings),

@@ -3,16 +3,19 @@ import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragMoveEvent 
 import { TopBar } from "@/components/TopBar";
 import { LeftRail } from "@/components/LeftRail";
 import { LeftPane } from "@/components/LeftPane/LeftPane";
+import { UtilitiesPane } from "@/components/LeftPane/UtilitiesPane";
 import { Stage } from "@/components/Stage/Stage";
 import { TimelineDock } from "@/components/Timeline/TimelineDock";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
+import { useUiStore } from "@/store/uiStore";
 import { pixelsToMs, snapToTimeline } from "@/lib/utils";
 import type { DragItem } from "@/types";
 import "./globals.css";
 
 function App() {
   const { createClip, moveClip, trimClip } = useProjectStore();
+  const { activeLeftPaneTab } = useUiStore();
   const [playheadDragStartX, setPlayheadDragStartX] = useState<number | null>(null);
 
   // Prevent default browser behavior on file drag/drop (avoids navigation)
@@ -99,6 +102,17 @@ function App() {
     }
   };
 
+  // Helper to render the active pane
+  const renderActivePane = () => {
+    switch (activeLeftPaneTab) {
+      case 'utilities':
+        return <UtilitiesPane />;
+      case 'library':
+      default:
+        return <LeftPane />;
+    }
+  };
+
   return (
     <div className="h-screen w-screen cosmic-bg overflow-hidden">
       <DndContext
@@ -119,9 +133,9 @@ function App() {
             <LeftRail />
           </div>
 
-          {/* LeftPane (collapsible) */}
+          {/* LeftPane (collapsible) - renders based on active tab */}
           <div className="col-start-2 row-start-2">
-            <LeftPane />
+            {renderActivePane()}
           </div>
 
           {/* Stage */}
