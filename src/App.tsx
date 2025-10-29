@@ -101,8 +101,11 @@ function App() {
     const dragItem = active.data.current as DragItem;
 
     if (dragItem.type === 'playhead') {
+      // Pause playback when user starts scrubbing
+      const { pause, currentTimeMs, zoom } = usePlaybackStore.getState();
+      pause();
+
       // Store initial position for playhead dragging - track last X for incremental updates
-      const { currentTimeMs, zoom } = usePlaybackStore.getState();
       const tracksScrollContainer = document.getElementById('tracks-scroll');
       if (tracksScrollContainer) {
         const rect = tracksScrollContainer.getBoundingClientRect();

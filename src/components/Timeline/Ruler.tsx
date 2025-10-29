@@ -1,10 +1,10 @@
 import { usePlaybackStore } from "@/store/playbackStore";
 import { useProjectStore } from "@/store/projectStore";
-import { formatTimecode, msToPixels, pixelsToMs, snapToTimeline } from "@/lib/utils";
+import { formatTimecode, msToPixels, pixelsToMs } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export function Ruler() {
-  const { zoom, seek, snapEnabled } = usePlaybackStore();
+  const { zoom, seek, pause } = usePlaybackStore();
   const { getTimelineDuration } = useProjectStore();
 
   // Generate time markers based on zoom level
@@ -44,6 +44,8 @@ export function Ruler() {
     const rect = event.currentTarget.getBoundingClientRect();
     const clickX = event.clientX - rect.left;
     const timeMs = pixelsToMs(clickX, zoom);
+    // Pause playback when clicking to seek
+    pause();
     // Don't snap when clicking directly on the ruler - seek to exact position
     // Snapping only happens when dragging the playhead handle
     seek(Math.max(0, timeMs));
