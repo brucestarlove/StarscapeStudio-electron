@@ -4,6 +4,7 @@ import { immer } from 'zustand/middleware/immer';
 import type { Asset, Clip, Track, CanvasNode, ProjectState } from '@/types';
 import { generateId } from '@/lib/utils';
 import { ingestFiles, type IngestResult } from '@/lib/bindings';
+import { audioManager } from '@/lib/AudioManager';
 
 interface ProjectStore extends ProjectState {
   // Asset actions
@@ -320,6 +321,9 @@ export const useProjectStore = create<ProjectStore>()(
           
           // Remove from selection
           state.selectedClipIds = state.selectedClipIds.filter((id: string) => id !== clipId);
+          
+          // Clean up audio element from AudioManager
+          audioManager.removeAudioElement(clip.trackId, clipId);
         });
       },
       
