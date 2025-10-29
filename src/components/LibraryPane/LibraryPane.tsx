@@ -1,13 +1,17 @@
 import { useState, useEffect } from "react";
 import { LibraryGrid } from "./LibraryGrid";
 import { UploadModal } from "./UploadModal";
-import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/uiStore";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Trash2, AlertCircle } from "lucide-react";
+import { useProjectStore } from "@/store/projectStore";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export function LibraryPane() {
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [duplicateAsset, setDuplicateAsset] = useState<string | null>(null);
   const { leftPaneCollapsed, setLeftPaneCollapsed } = useUiStore();
+  const { assets } = useProjectStore();
 
   // Ensure pane is visible when upload modal is opened
   useEffect(() => {
@@ -20,13 +24,31 @@ export function LibraryPane() {
         {/* Header */}
         <div className="flex items-center justify-between p-md border-b border-white/10">
           <h2 className="text-h3 font-semibold text-light-blue">Media Library</h2>
-          <button
-            onClick={() => setLeftPaneCollapsed(true)}
-            className="text-white/50 hover:text-white transition-colors"
-            title="Collapse media library pane"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-sm">
+            {/* Clear All button - only show if assets exist */}
+            {assets.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to clear all assets and reset the project? This cannot be undone.')) {
+                    const { clearProject } = useProjectStore.getState();
+                    clearProject();
+                  }
+                }}
+                className="text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors p-1.5 rounded"
+                title="Clear all assets"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+            {/* Collapse button */}
+            <button
+              onClick={() => setLeftPaneCollapsed(true)}
+              className="text-white/50 hover:text-white transition-colors"
+              title="Collapse media library pane"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -38,8 +60,36 @@ export function LibraryPane() {
       {/* Upload Modal */}
       <UploadModal 
         open={showUploadModal} 
-        onOpenChange={setShowUploadModal} 
+        onOpenChange={setShowUploadModal}
+        onDuplicateDetected={setDuplicateAsset}
       />
+
+      {/* Duplicate Asset Warning Dialog */}
+      <Dialog open={!!duplicateAsset} onOpenChange={() => setDuplicateAsset(null)}>
+        <DialogContent className="max-w-sm min-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-sm text-h3 font-semibold text-white">
+              <AlertCircle className="h-5 w-5 text-amber-400 shrink-0" />
+              Asset Already Exists
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-lg py-2">
+            <p className="text-body text-white/70">
+              An asset with the filename <span className="font-mono text-light-blue">{duplicateAsset}</span> already exists in your project.
+            </p>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="gradient"
+                onClick={() => setDuplicateAsset(null)}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

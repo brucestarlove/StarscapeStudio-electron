@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Play, Image, Music, Video, Trash2, ListPlus, Edit } from "lucide-react";
+import { Plus, Play, Image, Music, Video, ListPlus, Edit } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { formatTimecode, formatFileSize } from "@/lib/utils";
@@ -99,10 +99,12 @@ function AssetCard({ asset, onDoubleClick, onAddToTimeline, onRename }: AssetCar
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/10 text-white/80 capitalize">
                 {asset.type}
               </span>
-              {/* Duration */}
-              <span className="text-[10px] text-white/50 font-mono">
-                {formatTimecode(asset.duration)}
-              </span>
+              {/* Duration - only show for non-image assets */}
+              {asset.type !== 'image' && (
+                <span className="text-[10px] text-white/50 font-mono">
+                  {formatTimecode(asset.duration)}
+                </span>
+              )}
             </div>
 
             {/* Resolution and file size */}
@@ -145,7 +147,7 @@ interface LibraryGridProps {
 }
 
 export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
-  const { assets, createClip, clearProject } = useProjectStore();
+  const { assets, createClip } = useProjectStore();
   const { currentTimeMs } = usePlaybackStore();
   const { leftPaneCollapsed, setLeftPaneCollapsed } = useUiStore();
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
@@ -230,50 +232,36 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
     setRenameDialogOpen(true);
   };
 
-  const handleClearAll = () => {
-    if (window.confirm('Are you sure you want to clear all assets and reset the project? This cannot be undone.')) {
-      clearProject();
-    }
-  };
-
   return (
     <div className="h-full flex flex-col">
-      {/* Upload button */}
-      <div className="p-md space-y-sm">
-        <Button
-          variant="outline"
-          className="w-full h-20 flex flex-col items-center justify-center space-y-sm border-dashed border-2 border-light-blue/50 hover:border-light-blue hover:bg-light-blue/10"
-          onClick={handleUploadClick}
-        >
-          <Plus className="h-6 w-6 text-light-blue" />
-          <span className="text-light-blue font-medium">Upload Media</span>
-        </Button>
-
-        {assets.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-red-400 hover:text-red-300 hover:bg-red-500/10"
-            onClick={handleClearAll}
-          >
-            <Trash2 className="h-4 w-4 mr-xs" />
-            Clear All Assets
-          </Button>
-        )}
-      </div>
-
-      {/* Assets grid */}
+      {/* Assets grid with Upload button always first */}
       <div className="flex-1 overflow-auto scrollbar-starscape p-md">
         {assets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <Play className="h-12 w-12 text-white/30 mb-md" />
-            <p className="text-body-small text-white/50">
-              No media files yet.<br />
-              Click "Upload Media" to get started.
-            </p>
+          // Empty state with upload button
+          <div className="grid grid-cols-2 gap-md h-fit">
+            {/* Upload Media button */}
+            <Button
+              variant="outline"
+              className="h-full flex flex-col items-center justify-center space-y-sm border-dashed border-2 border-light-blue/50 hover:border-light-blue hover:bg-light-blue/10"
+              onClick={handleUploadClick}
+            >
+              <Plus className="h-6 w-6 text-light-blue" />
+              <span className="text-light-blue font-medium">Upload Media</span>
+            </Button>
           </div>
         ) : (
+          // Grid with upload button and assets
           <div className="grid grid-cols-2 gap-md">
+            {/* Upload Media button - same size as asset cards */}
+            <Button
+              variant="outline"
+              className="h-full flex flex-col items-center justify-center space-y-sm border-dashed border-2 border-light-blue/50 hover:border-light-blue hover:bg-light-blue/10"
+              onClick={handleUploadClick}
+            >
+              <Plus className="h-6 w-6 text-light-blue" />
+              <span className="text-light-blue font-medium">Upload Media</span>
+            </Button>
+
             {assets.map((asset) => (
               <AssetCard
                 key={asset.id}
