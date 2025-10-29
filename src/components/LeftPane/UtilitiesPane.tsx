@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { CheckCircle } from "lucide-react";
 
 export function UtilitiesPane() {
-  const { setLeftPaneCollapsed } = useUiStore();
+  const { setLeftPaneCollapsed, setActiveLeftPaneTab } = useUiStore();
   
   // Screen recording state
   const [recordingId, setRecordingId] = useState<string>("");
@@ -174,19 +174,19 @@ export function UtilitiesPane() {
             disabled
             className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
           >
-            Audio Tools
+            Webcam Recording
           </Button>
           <Button
             disabled
             className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
           >
-            Color Grading
+            Screen + Webcam Recording
           </Button>
           <Button
             disabled
             className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
           >
-            Batch Export
+            Microphone Recording
           </Button>
         </div>
 
@@ -204,7 +204,7 @@ export function UtilitiesPane() {
       {/* Success Modal */}
       {recordingSuccess && (
         <Dialog open={!!recordingSuccess} onOpenChange={() => setRecordingSuccess(null)}>
-          <DialogContent className="max-w-xxl min-w-[500px]">
+          <DialogContent className="max-w-xxl min-w-[600px]">
             <DialogHeader>
               <DialogTitle className="text-h3 font-semibold gradient-text">
                 Recording Saved
@@ -237,6 +237,7 @@ export function UtilitiesPane() {
                     try {
                       await addAssetsFromPaths([recordingSuccess.path]);
                       setRecordingSuccess(null);
+                      setActiveLeftPaneTab('library');
                     } catch (error) {
                       console.error('Error importing recording:', error);
                     }
@@ -248,7 +249,6 @@ export function UtilitiesPane() {
                   variant="gradient"
                   onClick={async () => {
                     await revealInFinder(recordingSuccess.path);
-                    setRecordingSuccess(null);
                   }}
                 >
                   Open in Finder
