@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Play, Image, Music, Video, ListPlus, Edit } from "lucide-react";
+import { Plus, Play, Image, Music, Video, ListPlus, Edit, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { formatTimecode, formatFileSize } from "@/lib/utils";
@@ -17,9 +17,10 @@ interface AssetCardProps {
   onDoubleClick: () => void;
   onAddToTimeline: () => void;
   onRename: () => void;
+  onDelete: () => void;
 }
 
-function AssetCard({ asset, onDoubleClick, onAddToTimeline, onRename }: AssetCardProps) {
+function AssetCard({ asset, onDoubleClick, onAddToTimeline, onRename, onDelete }: AssetCardProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: asset.id,
     data: {
@@ -137,6 +138,13 @@ function AssetCard({ asset, onDoubleClick, onAddToTimeline, onRename }: AssetCar
           <Edit className="h-4 w-4" />
           <span>Rename</span>
         </ContextMenuItem>
+        <ContextMenuItem
+          onClick={onDelete}
+          className="flex items-center gap-2 text-white/90 hover:text-white focus:bg-white/10 focus:text-white cursor-pointer"
+        >
+          <Trash2 className="h-4 w-4" />
+          <span>Delete</span>
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );
@@ -232,6 +240,12 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
     setRenameDialogOpen(true);
   };
 
+  const handleDelete = (assetId: string) => {
+    // Delete asset without confirmation
+    const state = useProjectStore.getState();
+    state.removeAsset(assetId);
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Assets grid with Upload button always first */}
@@ -269,6 +283,7 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
                 onDoubleClick={() => handleAssetDoubleClick(asset)}
                 onAddToTimeline={() => handleAddToTimeline(asset)}
                 onRename={() => handleRename(asset.id)}
+                onDelete={() => handleDelete(asset.id)}
               />
             ))}
           </div>

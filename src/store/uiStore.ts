@@ -22,7 +22,7 @@ export const useUiStore = create<UiState>()((set) => ({
   toggleLeftPane: () => set((s) => ({ leftPaneCollapsed: !s.leftPaneCollapsed })),
   activeLeftPaneTab: 'library',
   setActiveLeftPaneTab: (tab: LeftPaneTab) => set({ activeLeftPaneTab: tab }),
-  rightPaneCollapsed: false,
+  rightPaneCollapsed: true,
   setRightPaneCollapsed: (collapsed: boolean) => set({ rightPaneCollapsed: collapsed }),
   toggleRightPane: () => set((s) => ({ rightPaneCollapsed: !s.rightPaneCollapsed })),
   activeRightPaneTab: 'transitions',
