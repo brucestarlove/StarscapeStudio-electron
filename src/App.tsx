@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragMoveEvent } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragMoveEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { TopBar } from "@/components/TopBar";
 import { LeftRail } from "@/components/LeftRail";
 import { LeftPane } from "@/components/LeftPane/LeftPane";
@@ -18,6 +18,16 @@ function App() {
   const { activeLeftPaneTab } = useUiStore();
   const [playheadDragStartX, setPlayheadDragStartX] = useState<number | null>(null);
   const [clipDragData, setClipDragData] = useState<{ activeId: string; positionMs: number } | null>(null);
+
+  // Configure drag sensors with activation constraints
+  // This prevents drag from triggering on simple clicks
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px of movement before drag starts
+      },
+    })
+  );
 
   // Prevent default browser behavior on file drag/drop (avoids navigation)
   useEffect(() => {
@@ -171,6 +181,7 @@ function App() {
   return (
     <div className="h-screen w-screen cosmic-bg overflow-hidden">
       <DndContext
+        sensors={sensors}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragMove={handleDragMove}

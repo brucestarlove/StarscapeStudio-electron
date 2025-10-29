@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { startScreenRecord, stopScreenRecord, listenStartRecording, listenStopRecording, saveBlobToFile, revealInFinder } from "@/lib/bindings";
 import { useUiStore } from "@/store/uiStore";
+import { useProjectStore } from "@/store/projectStore";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, ChevronLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function UtilitiesPane() {
-  const { setLeftPaneCollapsed } = useUiStore();
+  const { setLeftPaneCollapsed, setActiveLeftPaneTab, leftPaneCollapsed } = useUiStore();
   
   // Screen recording state
   const [recordingId, setRecordingId] = useState<string>("");
@@ -137,111 +139,134 @@ export function UtilitiesPane() {
   };
 
   return (
-    <div className="h-full bg-mid-navy border-r border-light-blue/20 w-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-md border-b border-white/10">
-        <h2 className="text-h3 font-semibold text-light-blue">Utilities</h2>
-        <button
-          onClick={() => setLeftPaneCollapsed(true)}
-          className="text-white/50 hover:text-white transition-colors"
-        >
-          ×
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-md space-y-md">
-        {/* Screen Recording Section */}
-        <div className="space-y-sm">
-          <h3 className="text-sm font-semibold text-white/80">Screen Recording</h3>
-          <Button
-            onClick={handleRecordToggle}
-            className={`w-full py-2 rounded transition-all ${
-              recordingId 
-                ? 'bg-red-600/80 hover:bg-red-600 text-white' 
-                : 'bg-gradient-cyan-purple text-white hover:opacity-90'
-            }`}
-          >
-            {recordingId ? '⏹ Stop Recording' : '⏥ Start Recording'}
-          </Button>
-        </div>
-
-        {/* Other Utilities (Disabled for now) */}
-        <div className="space-y-sm">
-          <h3 className="text-sm font-semibold text-white/80">More Tools</h3>
-          <Button
-            disabled
-            className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
-          >
-            Audio Tools
-          </Button>
-          <Button
-            disabled
-            className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
-          >
-            Color Grading
-          </Button>
-          <Button
-            disabled
-            className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
-          >
-            Batch Export
-          </Button>
-        </div>
-
-        {/* Debug Logs */}
-        {logs && (
-          <div className="space-y-sm pt-md border-t border-white/10">
-            <h3 className="text-xs font-semibold text-white/60">Debug Logs</h3>
-            <pre className="bg-black/40 p-xs rounded text-xs text-white/70 max-h-32 overflow-auto whitespace-pre-wrap break-words">
-              {logs}
-            </pre>
+    <>
+      <div className={cn(
+        "h-full bg-mid-navy border-r border-light-blue/20 transition-all duration-300",
+        leftPaneCollapsed ? "w-0 overflow-hidden" : "w-full"
+      )}>
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-md border-b border-white/10">
+            <h2 className="text-h3 font-semibold text-light-blue">Utilities</h2>
+            <button
+              onClick={() => setLeftPaneCollapsed(true)}
+              className="text-white/50 hover:text-white transition-colors"
+              title="Collapse utilities pane"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
           </div>
-        )}
-      </div>
 
-      {/* Success Modal */}
-      {recordingSuccess && (
-        <Dialog open={!!recordingSuccess} onOpenChange={() => setRecordingSuccess(null)}>
-          <DialogContent className="max-w-xl min-w-[500px]">
-            <DialogHeader>
-              <DialogTitle className="text-h3 font-semibold gradient-text">
-                Recording Saved
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-lg">
-              <div className="text-center space-y-md py-4">
-                <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
-                <div>
-                  <p className="text-h4 text-white mb-md font-semibold">Recording saved successfully!</p>
-                  <div className="bg-white/5 rounded-lg p-md border border-white/10">
-                    <p className="text-caption text-white/70 break-all text-left font-mono">
-                      {recordingSuccess.path}
-                    </p>
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-md space-y-md">
+            {/* Screen Recording Section */}
+            <div className="space-y-sm">
+              <h3 className="text-sm font-semibold text-white/80">Screen Recording</h3>
+              <Button
+                onClick={handleRecordToggle}
+                className={`w-full py-2 rounded transition-all ${
+                  recordingId 
+                    ? 'bg-red-600/80 hover:bg-red-600 text-white' 
+                    : 'bg-gradient-cyan-purple text-white hover:opacity-90'
+                }`}
+              >
+                {recordingId ? '⏹ Stop Recording' : '⏥ Start Recording'}
+              </Button>
+            </div>
+
+            {/* Other Utilities (Disabled for now) */}
+            <div className="space-y-sm">
+              <h3 className="text-sm font-semibold text-white/80">Coming Soon™️</h3>
+              <Button
+                disabled
+                className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
+              >
+                Webcam Recording
+              </Button>
+              <Button
+                disabled
+                className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
+              >
+                Screen + Webcam Recording
+              </Button>
+              <Button
+                disabled
+                className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
+              >
+                Microphone Recording
+              </Button>
+            </div>
+
+            {/* Debug Logs */}
+            {logs && (
+              <div className="space-y-sm pt-md border-t border-white/10">
+                <h3 className="text-xs font-semibold text-white/60">Debug Logs</h3>
+                <pre className="bg-black/40 p-xs rounded text-xs text-white/70 max-h-32 overflow-auto whitespace-pre-wrap break-words">
+                  {logs}
+                </pre>
+              </div>
+            )}
+          </div>
+
+          {/* Success Modal */}
+          {recordingSuccess && (
+            <Dialog open={!!recordingSuccess} onOpenChange={() => setRecordingSuccess(null)}>
+              <DialogContent className="max-w-xxl min-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle className="text-h3 font-semibold gradient-text">
+                    Recording Saved
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-lg">
+                  <div className="text-center space-y-md py-4">
+                    <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
+                    <div>
+                      <p className="text-h4 text-white mb-md font-semibold">Recording saved successfully!</p>
+                      <div className="bg-white/5 rounded-lg p-md border border-white/10">
+                        <p className="text-caption text-white/70 break-all text-left font-mono">
+                          {recordingSuccess.path}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-sm">
+                    <Button
+                      variant="outline"
+                      onClick={() => setRecordingSuccess(null)}
+                    >
+                      Close
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        // Import the recording to the project library
+                        const { addAssetsFromPaths } = useProjectStore.getState();
+                        try {
+                          await addAssetsFromPaths([recordingSuccess.path]);
+                          setRecordingSuccess(null);
+                          setActiveLeftPaneTab('library');
+                        } catch (error) {
+                          console.error('Error importing recording:', error);
+                        }
+                      }}
+                    >
+                      Import to Library
+                    </Button>
+                    <Button
+                      variant="gradient"
+                      onClick={async () => {
+                        await revealInFinder(recordingSuccess.path);
+                      }}
+                    >
+                      Open in Finder
+                    </Button>
                   </div>
                 </div>
-              </div>
-              <div className="flex justify-end space-x-sm">
-                <Button
-                  variant="outline"
-                  onClick={() => setRecordingSuccess(null)}
-                >
-                  Close
-                </Button>
-                <Button
-                  variant="gradient"
-                  onClick={async () => {
-                    await revealInFinder(recordingSuccess.path);
-                    setRecordingSuccess(null);
-                  }}
-                >
-                  Open in Finder
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+      </div>
+    </>
   );
 }

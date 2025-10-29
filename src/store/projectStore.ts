@@ -484,6 +484,9 @@ export const useProjectStore = create<ProjectStore>()(
       },
       
       clearProject: () => {
+        // Clear all audio elements from the AudioManager
+        audioManager.clear();
+        // Reset project state
         set(() => ({ ...initialProjectState }));
       },
       
