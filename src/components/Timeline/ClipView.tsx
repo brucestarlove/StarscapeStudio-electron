@@ -4,7 +4,7 @@ import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { msToPixels, formatTimecode } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Clip } from "@/types";
 import {
   DropdownMenu,
@@ -30,6 +30,10 @@ export function ClipView({ clip }: ClipViewProps) {
   
   // Context menu state
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  
+  // Track if we should enable dragging (only after significant mouse movement)
+  const [enableDrag, setEnableDrag] = useState(false);
+  const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: clip.id,
@@ -37,6 +41,7 @@ export function ClipView({ clip }: ClipViewProps) {
       type: 'clip' as const,
       id: clip.id,
     },
+    disabled: !enableDrag, // Only enable drag when we detect movement
   });
 
   if (!asset) return null;
@@ -56,9 +61,49 @@ export function ClipView({ clip }: ClipViewProps) {
   const clipWidth = msToPixels(clip.endMs - clip.startMs, zoom);
   const clipLeft = msToPixels(clip.startMs, zoom);
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    selectClip(clip.id);
+  // Custom mouse handlers to distinguish click from drag
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Don't interfere with trim handles
+    if ((e.target as HTMLElement).classList.contains('trim-handle')) {
+      return;
+    }
+    
+    // Don't interfere with context menu trigger
+    if (e.button === 2) return; // Right click
+    
+    mouseDownPos.current = { x: e.clientX, y: e.clientY };
+    setEnableDrag(false); // Start with drag disabled
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!mouseDownPos.current) return;
+    
+    // Check if mouse has moved enough to start dragging
+    const dx = Math.abs(e.clientX - mouseDownPos.current.x);
+    const dy = Math.abs(e.clientY - mouseDownPos.current.y);
+    
+    // Enable drag if movement exceeds threshold (10px for more reliable detection)
+    if (dx > 10 || dy > 10) {
+      setEnableDrag(true);
+    }
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    // Only treat as click if drag was never enabled
+    if (mouseDownPos.current && !enableDrag && !isDragging) {
+      const dx = Math.abs(e.clientX - mouseDownPos.current.x);
+      const dy = Math.abs(e.clientY - mouseDownPos.current.y);
+      
+      if (dx < 10 && dy < 10) {
+        // This is a click, not a drag
+        e.stopPropagation();
+        selectClip(clip.id);
+      }
+    }
+    
+    // Reset drag state
+    mouseDownPos.current = null;
+    setEnableDrag(false);
   };
 
   // Handle right-click context menu
@@ -134,9 +179,11 @@ export function ClipView({ clip }: ClipViewProps) {
             left: `${clipLeft}px`,
             width: `${Math.max(clipWidth, 20)}px`, // Minimum width
           }}
-          onClick={handleClick}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
           onContextMenu={handleContextMenu}
-          {...listeners}
+          {...(enableDrag ? listeners : {})}
           {...attributes}
         >
           {/* Clip content */}
@@ -160,7 +207,7 @@ export function ClipView({ clip }: ClipViewProps) {
               {/* Left trim handle */}
               <div
                 className={cn(
-                  "absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-l-sm",
+                  "trim-handle absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-l-sm",
                   "bg-gradient-to-r from-light-blue/60 to-light-blue/40",
                   isSelected ? "opacity-100" : "opacity-0"
                 )}
@@ -170,7 +217,7 @@ export function ClipView({ clip }: ClipViewProps) {
               {/* Right trim handle */}
               <div
                 className={cn(
-                  "absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-r-sm",
+                  "trim-handle absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-r-sm",
                   "bg-gradient-to-l from-light-blue/60 to-light-blue/40",
                   isSelected ? "opacity-100" : "opacity-0"
                 )}
