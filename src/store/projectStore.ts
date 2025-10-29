@@ -12,6 +12,7 @@ interface ProjectStore extends ProjectState {
   addAssets: (files: File[]) => Promise<void>;
   addAssetsFromPaths: (filePaths: string[]) => Promise<void>;
   removeAsset: (assetId: string) => void;
+  renameAsset: (assetId: string, newName: string) => void;
 
   // Track actions
   addTrack: (type: 'video' | 'audio', name?: string) => void;
@@ -212,6 +213,15 @@ export const useProjectStore = create<ProjectStore>()(
 
           // Clean up selection
           state.selectedClipIds = state.selectedClipIds.filter((id: string) => !clipIds.includes(id));
+        });
+      },
+
+      renameAsset: (assetId: string, newName: string) => {
+        set((state) => {
+          const asset = state.assets.find((a: Asset) => a.id === assetId);
+          if (asset) {
+            asset.name = newName;
+          }
         });
       },
 

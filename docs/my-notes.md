@@ -24,13 +24,13 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 [x] 2nd video track
 [x] split
 [x] import asset with the original name
-[ ] better dragging, arrange clips in a sequence
+[x] better dragging, arrange clips in a sequence
 [ ] right click menu to rename asset
 [ ] right pane with edit features (and making the whole layout responsive)
-[ ] asset metadata: resolution and file size
+[x] asset metadata: resolution and file size
 [ ] snap to grid / snap to clip edges etc
 [ ] mouse scroll linked to zoom in/out
-[ ] smooth seek header interactivity
+[x] smooth seek header interactivity
 [ ] progress indicator during export
 [ ] hide scrolllbars unless actively scrolling
 
