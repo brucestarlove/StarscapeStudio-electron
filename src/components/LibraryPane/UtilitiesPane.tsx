@@ -5,10 +5,9 @@ import { useProjectStore } from "@/store/projectStore";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle, ChevronLeft } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export function UtilitiesPane() {
-  const { setLeftPaneCollapsed, setActiveLeftPaneTab, leftPaneCollapsed } = useUiStore();
+  const { setLeftPaneCollapsed, setActiveLeftPaneTab } = useUiStore();
   
   // Screen recording state
   const [recordingId, setRecordingId] = useState<string>("");
@@ -140,25 +139,21 @@ export function UtilitiesPane() {
 
   return (
     <>
-      <div className={cn(
-        "h-full bg-mid-navy border-r border-light-blue/20 transition-all duration-300",
-        leftPaneCollapsed ? "w-0 overflow-hidden" : "w-full"
-      )}>
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-md border-b border-white/10">
-            <h2 className="text-h3 font-semibold text-light-blue">Utilities</h2>
-            <button
-              onClick={() => setLeftPaneCollapsed(true)}
-              className="text-white/50 hover:text-white transition-colors"
-              title="Collapse utilities pane"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-          </div>
+      <div className="h-full flex flex-col bg-mid-navy border-r border-light-blue/20 w-[300px]">
+        {/* Header */}
+        <div className="flex items-center justify-between p-md border-b border-white/10">
+          <h2 className="text-h3 font-semibold text-light-blue">Utilities</h2>
+          <button
+            onClick={() => setLeftPaneCollapsed(true)}
+            className="text-white/50 hover:text-white transition-colors"
+            title="Collapse utilities pane"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-md space-y-md">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-md space-y-md">
             {/* Screen Recording Section */}
             <div className="space-y-sm">
               <h3 className="text-sm font-semibold text-white/80">Screen Recording</h3>
@@ -206,67 +201,66 @@ export function UtilitiesPane() {
                 </pre>
               </div>
             )}
-          </div>
-
-          {/* Success Modal */}
-          {recordingSuccess && (
-            <Dialog open={!!recordingSuccess} onOpenChange={() => setRecordingSuccess(null)}>
-              <DialogContent className="max-w-xxl min-w-[600px]">
-                <DialogHeader>
-                  <DialogTitle className="text-h3 font-semibold gradient-text">
-                    Recording Saved
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-lg">
-                  <div className="text-center space-y-md py-4">
-                    <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
-                    <div>
-                      <p className="text-h4 text-white mb-md font-semibold">Recording saved successfully!</p>
-                      <div className="bg-white/5 rounded-lg p-md border border-white/10">
-                        <p className="text-caption text-white/70 break-all text-left font-mono">
-                          {recordingSuccess.path}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex justify-end space-x-sm">
-                    <Button
-                      variant="outline"
-                      onClick={() => setRecordingSuccess(null)}
-                    >
-                      Close
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        // Import the recording to the project library
-                        const { addAssetsFromPaths } = useProjectStore.getState();
-                        try {
-                          await addAssetsFromPaths([recordingSuccess.path]);
-                          setRecordingSuccess(null);
-                          setActiveLeftPaneTab('library');
-                        } catch (error) {
-                          console.error('Error importing recording:', error);
-                        }
-                      }}
-                    >
-                      Import to Library
-                    </Button>
-                    <Button
-                      variant="gradient"
-                      onClick={async () => {
-                        await revealInFinder(recordingSuccess.path);
-                      }}
-                    >
-                      Open in Finder
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
         </div>
       </div>
+
+      {/* Success Modal */}
+      {recordingSuccess && (
+        <Dialog open={!!recordingSuccess} onOpenChange={() => setRecordingSuccess(null)}>
+          <DialogContent className="max-w-xxl min-w-[600px]">
+            <DialogHeader>
+              <DialogTitle className="text-h3 font-semibold gradient-text">
+                Recording Saved
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-lg">
+              <div className="text-center space-y-md py-4">
+                <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
+                <div>
+                  <p className="text-h4 text-white mb-md font-semibold">Recording saved successfully!</p>
+                  <div className="bg-white/5 rounded-lg p-md border border-white/10">
+                    <p className="text-caption text-white/70 break-all text-left font-mono">
+                      {recordingSuccess.path}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-sm">
+                <Button
+                  variant="outline"
+                  onClick={() => setRecordingSuccess(null)}
+                >
+                  Close
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    // Import the recording to the project library
+                    const { addAssetsFromPaths } = useProjectStore.getState();
+                    try {
+                      await addAssetsFromPaths([recordingSuccess.path]);
+                      setRecordingSuccess(null);
+                      setActiveLeftPaneTab('library');
+                    } catch (error) {
+                      console.error('Error importing recording:', error);
+                    }
+                  }}
+                >
+                  Import to Library
+                </Button>
+                <Button
+                  variant="gradient"
+                  onClick={async () => {
+                    await revealInFinder(recordingSuccess.path);
+                  }}
+                >
+                  Open in Finder
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

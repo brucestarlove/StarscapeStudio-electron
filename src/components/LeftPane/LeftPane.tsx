@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/uiStore";
 import { ChevronLeft } from "lucide-react";
 
-export function LeftPane() {
+export function LibraryPane() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const { leftPaneCollapsed, setLeftPaneCollapsed } = useUiStore();
 
