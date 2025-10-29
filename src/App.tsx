@@ -63,6 +63,34 @@ function App() {
     };
   }, [deleteClip, getSelectedClips]);
 
+  // Handle 'S' key for splitting selected clip at playhead
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const { selectedClipIds, splitClip, getSelectedClips } = useProjectStore.getState();
+        const { currentTimeMs } = usePlaybackStore.getState();
+        
+        // Check if exactly one clip is selected
+        if (selectedClipIds.length !== 1) return;
+
+        const selectedClip = getSelectedClips()[0];
+        if (!selectedClip) return;
+
+        // Check if playhead is within the clip bounds (not at edges)
+        if (currentTimeMs <= selectedClip.startMs || currentTimeMs >= selectedClip.endMs) return;
+
+        e.preventDefault();
+        // Split the clip at the current playhead position
+        splitClip(selectedClipIds[0], currentTimeMs);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     console.log('Drag started:', active.id);
