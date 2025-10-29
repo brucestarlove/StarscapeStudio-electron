@@ -65,6 +65,7 @@ export interface IngestResult {
   file_path: string;
   original_file_name: string;
   thumbnail_path: string | null;
+  file_size: number;
   metadata: MediaMeta;
 }
 

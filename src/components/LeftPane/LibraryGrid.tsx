@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Play, Image, Music, Video, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
-import { formatTimecode } from "@/lib/utils";
+import { formatTimecode, formatFileSize } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/uiStore";
 import type { Asset } from "@/types";
@@ -79,7 +79,7 @@ function AssetCard({ asset, onDoubleClick }: AssetCardProps) {
       </div>
       
       {/* Asset Info - Bottom Half */}
-      <CardContent className="p-2 space-y-1.5">
+      <CardContent className="space-y-1.5">
         <h3 
           className="text-xs font-medium text-white truncate leading-tight group-hover:text-light-blue transition-colors" 
           title={asset.name}
@@ -96,6 +96,19 @@ function AssetCard({ asset, onDoubleClick }: AssetCardProps) {
           <span className="text-[10px] text-white/50 font-mono">
             {formatTimecode(asset.duration)}
           </span>
+        </div>
+        
+        {/* Resolution and file size */}
+        <div className="text-[10px] text-white/40 flex items-center gap-2">
+          {asset.metadata.width && asset.metadata.height && (
+            <>
+              <span>{asset.metadata.width}×{asset.metadata.height}</span>
+              {asset.fileSize && <span>•</span>}
+            </>
+          )}
+          {asset.fileSize && (
+            <span>{formatFileSize(asset.fileSize)}</span>
+          )}
         </div>
       </CardContent>
     </Card>

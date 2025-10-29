@@ -7,6 +7,7 @@ export interface Asset {
   url: string;          // Object URL for local files
   duration: number;     // milliseconds
   thumbnailUrl?: string;
+  fileSize?: number;    // bytes
   metadata: {
     width?: number;
     height?: number;

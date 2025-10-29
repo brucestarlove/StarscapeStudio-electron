@@ -111,6 +111,10 @@ async function ingestFiles(filePaths, cache) {
         throw new Error(`Failed to copy file to cache: ${cachedPath}`);
       }
 
+      // Get file size
+      const fileStats = await fs.stat(cachedPath);
+      const fileSize = fileStats.size;
+
       // Extract metadata
       const metadata = await probeMedia(cachedPath);
 
@@ -140,6 +144,7 @@ async function ingestFiles(filePaths, cache) {
         file_path: cachedPath,
         original_file_name: originalFileName,
         thumbnail_path: thumbnailPath,
+        file_size: fileSize,
         metadata,
       });
     } catch (error) {

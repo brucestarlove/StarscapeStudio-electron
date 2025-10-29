@@ -171,6 +171,7 @@ export const useProjectStore = create<ProjectStore>()(
               name: result.original_file_name, // Use original file name
               url: `media://${result.file_path}`, // Use custom media:// protocol for local files
               thumbnailUrl: result.thumbnail_path ? `media://${result.thumbnail_path}` : undefined,
+              fileSize: result.file_size,
               duration: result.metadata.duration_ms,
               metadata: {
                 width: result.metadata.width || 0,
