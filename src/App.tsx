@@ -9,13 +9,13 @@ import { TimelineDock } from "@/components/Timeline/TimelineDock";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { useUiStore } from "@/store/uiStore";
-import { pixelsToMs, snapToTimeline, msToPixels, formatTimecode } from "@/lib/utils";
+import { pixelsToMs, snapToTimeline, msToPixels, formatTimecode, resolveClipCollision } from "@/lib/utils";
 import type { DragItem, Clip } from "@/types";
 import { Play, Music, Image } from "lucide-react";
 import "./globals.css";
 
 function App() {
-  const { createClip, moveClip, trimClip, deleteClip, getSelectedClips, getAssetById } = useProjectStore();
+  const { createClip, moveClip, trimClip, deleteClip, getSelectedClips, getAssetById, getClipsByTrack } = useProjectStore();
   const { activeLeftPaneTab } = useUiStore();
   const [playheadDragStartX, setPlayheadDragStartX] = useState<number | null>(null);
   const [lastDragX, setLastDragX] = useState<number>(0);
@@ -113,7 +113,6 @@ function App() {
     } else if (dragItem.type === 'clip') {
       // For clip dragging, calculate the offset from the clip's left edge to where the user grabbed
       const { clips } = useProjectStore.getState();
-      const { zoom } = usePlaybackStore.getState();
       const clip = clips[dragItem.id];
 
       if (clip) {
@@ -223,18 +222,49 @@ function App() {
     }
 
     // Use the tracked position from drag movement, or fall back to over data
-    const positionMs = clipDragData?.positionMs ?? (over.data.current as { trackId: string; positionMs: number }).positionMs ?? 0;
+    let positionMs = clipDragData?.positionMs ?? (over.data.current as { trackId: string; positionMs: number }).positionMs ?? 0;
     const dropResult = {
       trackId: over.data.current?.trackId,
       positionMs
     };
 
     if (dragItem.type === 'asset' && dropResult.trackId) {
-      // Create new clip from asset
-      createClip(dragItem.id, dropResult.trackId, positionMs);
+      // Create new clip from asset - check for collisions
+      const { assets } = useProjectStore.getState();
+      const asset = assets.find(a => a.id === dragItem.id);
+
+      if (asset) {
+        const trackClips = getClipsByTrack(dropResult.trackId);
+        const clipDuration = asset.duration;
+
+        // Resolve collision by snapping to end of overlapping clip
+        const resolvedPosition = resolveClipCollision(
+          positionMs,
+          clipDuration,
+          trackClips
+        );
+
+        createClip(dragItem.id, dropResult.trackId, resolvedPosition);
+      }
     } else if (dragItem.type === 'clip' && dropResult.trackId) {
-      // Move existing clip
-      moveClip(dragItem.id, dropResult.trackId, positionMs);
+      // Move existing clip - check for collisions
+      const { clips } = useProjectStore.getState();
+      const clip = clips[dragItem.id];
+
+      if (clip) {
+        const trackClips = getClipsByTrack(dropResult.trackId);
+        const clipDuration = clip.endMs - clip.startMs;
+
+        // Resolve collision by snapping to end of overlapping clip (exclude the clip being moved)
+        const resolvedPosition = resolveClipCollision(
+          positionMs,
+          clipDuration,
+          trackClips,
+          dragItem.id
+        );
+
+        moveClip(dragItem.id, dropResult.trackId, resolvedPosition);
+      }
     } else if (dragItem.type === 'trim-handle' && dragItem.clipId) {
       // Handle trim operation
       const deltaMs = dropResult.positionMs - (dragItem.side === 'left' ? 0 : 1000); // Simplified

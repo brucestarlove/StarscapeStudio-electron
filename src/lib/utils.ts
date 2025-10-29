@@ -19,7 +19,7 @@ export function formatTimecode(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   const milliseconds = Math.floor((ms % 1000) / 10);
-  
+
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
 }
 
@@ -41,13 +41,13 @@ export function snapToClips(value: number, clips: Array<{ startMs: number; endMs
 
 export function snapToTimeline(value: number, zoom: number, snapEnabled: boolean = true): number {
   if (!snapEnabled) return value;
-  
+
   // Determine snap interval based on zoom level
   let snapIntervalMs = 1000; // 1 second default
   if (zoom > 0.5) snapIntervalMs = 100; // 100ms for high zoom
   else if (zoom > 0.1) snapIntervalMs = 500; // 500ms for medium zoom
   else if (zoom < 0.05) snapIntervalMs = 5000; // 5 seconds for low zoom
-  
+
   return snapToGrid(value, snapIntervalMs);
 }
 
@@ -85,22 +85,68 @@ export function generateId(): string {
 
 // Validate clip operations
 export function validateClipTrim(clip: { trimStartMs: number; trimEndMs: number }, assetDuration: number): boolean {
-  return clip.trimStartMs >= 0 && 
-         clip.trimEndMs <= assetDuration && 
-         clip.trimStartMs < clip.trimEndMs;
+  return clip.trimStartMs >= 0 &&
+    clip.trimEndMs <= assetDuration &&
+    clip.trimStartMs < clip.trimEndMs;
 }
 
 export function validateClipPosition(clip: { startMs: number; endMs: number }): boolean {
   return clip.startMs >= 0 && clip.startMs < clip.endMs;
 }
 
+// Collision detection for clips on timeline
+export function detectClipCollision(
+  newClipStart: number,
+  newClipEnd: number,
+  trackClips: Array<{ id: string; startMs: number; endMs: number }>,
+  excludeClipId?: string
+): { hasCollision: boolean; collidingClip?: { id: string; startMs: number; endMs: number } } {
+  // Check if the new clip would overlap with any existing clips on the track
+  for (const clip of trackClips) {
+    // Skip the clip being moved (if provided)
+    if (excludeClipId && clip.id === excludeClipId) continue;
+
+    // Check for overlap: clips overlap if one starts before the other ends
+    const overlaps = newClipStart < clip.endMs && newClipEnd > clip.startMs;
+
+    if (overlaps) {
+      return { hasCollision: true, collidingClip: clip };
+    }
+  }
+
+  return { hasCollision: false };
+}
+
+// Resolve clip collision by snapping to the end of the colliding clip
+export function resolveClipCollision(
+  desiredStartMs: number,
+  clipDuration: number,
+  trackClips: Array<{ id: string; startMs: number; endMs: number }>,
+  excludeClipId?: string
+): number {
+  const desiredEndMs = desiredStartMs + clipDuration;
+
+  // Check for collision
+  const collision = detectClipCollision(desiredStartMs, desiredEndMs, trackClips, excludeClipId);
+
+  if (collision.hasCollision && collision.collidingClip) {
+    // Find the clip that the user is trying to drop onto
+    const targetClip = collision.collidingClip;
+
+    // Snap to the end of the target clip
+    return targetClip.endMs;
+  }
+
+  return desiredStartMs;
+}
+
 // Format file size in human-readable format
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B';
-  
+
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return Math.round((bytes / Math.pow(k, i)) * 10) / 10 + ' ' + sizes[i];
 }
