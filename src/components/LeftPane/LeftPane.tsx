@@ -3,6 +3,7 @@ import { LibraryGrid } from "./LibraryGrid";
 import { UploadModal } from "./UploadModal";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/uiStore";
+import { ChevronLeft } from "lucide-react";
 
 export function LeftPane() {
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -26,8 +27,9 @@ export function LeftPane() {
             <button
               onClick={() => setLeftPaneCollapsed(true)}
               className="text-white/50 hover:text-white transition-colors"
+              title="Collapse media library pane"
             >
-              ×
+              <ChevronLeft className="h-5 w-5" />
             </button>
           </div>
 
