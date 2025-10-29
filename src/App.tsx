@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragMoveEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragMoveEvent, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { TopBar } from "@/components/TopBar";
 import { LeftRail } from "@/components/LeftRail";
 import { LeftPane } from "@/components/LeftPane/LeftPane";
@@ -9,16 +9,18 @@ import { TimelineDock } from "@/components/Timeline/TimelineDock";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
 import { useUiStore } from "@/store/uiStore";
-import { pixelsToMs, snapToTimeline } from "@/lib/utils";
-import type { DragItem } from "@/types";
+import { pixelsToMs, snapToTimeline, msToPixels, formatTimecode } from "@/lib/utils";
+import type { DragItem, Clip } from "@/types";
+import { Play, Music, Image } from "lucide-react";
 import "./globals.css";
 
 function App() {
-  const { createClip, moveClip, trimClip, deleteClip, getSelectedClips } = useProjectStore();
+  const { createClip, moveClip, trimClip, deleteClip, getSelectedClips, getAssetById } = useProjectStore();
   const { activeLeftPaneTab } = useUiStore();
   const [playheadDragStartX, setPlayheadDragStartX] = useState<number | null>(null);
   const [lastDragX, setLastDragX] = useState<number>(0);
   const [clipDragData, setClipDragData] = useState<{ activeId: string; positionMs: number } | null>(null);
+  const [activeDragItem, setActiveDragItem] = useState<{ item: DragItem; clip?: Clip; offsetX: number } | null>(null);
 
   // Configure drag sensors with activation constraints
   // This prevents drag from triggering on simple clicks
@@ -70,7 +72,7 @@ function App() {
       if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const { selectedClipIds, splitClip, getSelectedClips } = useProjectStore.getState();
         const { currentTimeMs } = usePlaybackStore.getState();
-        
+
         // Check if exactly one clip is selected
         if (selectedClipIds.length !== 1) return;
 
@@ -95,8 +97,9 @@ function App() {
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     console.log('Drag started:', active.id);
-    
+
     const dragItem = active.data.current as DragItem;
+
     if (dragItem.type === 'playhead') {
       // Store initial position for playhead dragging - track last X for incremental updates
       const { currentTimeMs, zoom } = usePlaybackStore.getState();
@@ -107,6 +110,33 @@ function App() {
         setPlayheadDragStartX(rect.left + (currentTimeMs * zoom));
         setLastDragX(0); // Reset to 0 at drag start
       }
+    } else if (dragItem.type === 'clip') {
+      // For clip dragging, calculate the offset from the clip's left edge to where the user grabbed
+      const { clips } = useProjectStore.getState();
+      const { zoom } = usePlaybackStore.getState();
+      const clip = clips[dragItem.id];
+
+      if (clip) {
+        // Get the clip element to find where the user clicked relative to the clip's start
+        const clipElement = document.querySelector(`[data-clip-id="${clip.id}"]`) as HTMLElement;
+        if (clipElement) {
+          const clipRect = clipElement.getBoundingClientRect();
+          const grabOffsetX = event.activatorEvent ?
+            (event.activatorEvent as MouseEvent).clientX - clipRect.left : 0;
+
+          setActiveDragItem({
+            item: dragItem,
+            clip,
+            offsetX: grabOffsetX
+          });
+        }
+      }
+    } else if (dragItem.type === 'asset') {
+      // For assets being dragged from library, offset is 0 (drag from start)
+      setActiveDragItem({
+        item: dragItem,
+        offsetX: 0
+      });
     }
   };
 
@@ -118,40 +148,48 @@ function App() {
   const handleDragMove = (event: DragMoveEvent) => {
     const { active, delta } = event;
     const dragItem = active.data.current as DragItem;
-    
+
     if (dragItem.type === 'playhead' && playheadDragStartX !== null) {
       const { seek, zoom, currentTimeMs } = usePlaybackStore.getState();
-      
+
       // Calculate incremental delta since last move (delta.x is cumulative from drag start)
       const incrementalDeltaX = delta.x - lastDragX;
       const deltaMs = pixelsToMs(incrementalDeltaX, zoom);
       const newTimeMs = Math.max(0, currentTimeMs + deltaMs);
-      
+
       // Update last position for next delta calculation
       setLastDragX(delta.x);
-      
+
       // Update playhead position in real-time (no snapping during drag)
       seek(newTimeMs);
-    } else if (dragItem.type === 'clip' || dragItem.type === 'asset') {
-      // For clips/assets being dragged, calculate the position in milliseconds
+    } else if ((dragItem.type === 'clip' || dragItem.type === 'asset') && activeDragItem) {
+      // For clips/assets being dragged, calculate the position accounting for grab offset
       const { zoom } = usePlaybackStore.getState();
       const tracksScrollContainer = document.getElementById('tracks-scroll');
-      
-      if (tracksScrollContainer) {
+
+      if (tracksScrollContainer && event.activatorEvent) {
+        // Get current mouse position
+        const mouseEvent = event.activatorEvent as PointerEvent;
+        const currentMouseX = mouseEvent.clientX + delta.x;
+
         // Get the scroll offset to account for horizontal scrolling
         const scrollLeft = tracksScrollContainer.scrollLeft;
-        
-        // Get the mouse position relative to the viewport
+
+        // Get the tracks container position
         const containerRect = tracksScrollContainer.getBoundingClientRect();
-        
-        // Calculate position in the timeline: 
-        // The track headers are 224px wide (w-56 = 14rem ≈ 224px)
-        // So we need to subtract that offset
-        const positionInTimeline = scrollLeft + (delta.x - (containerRect.left - scrollLeft));
-        
+
+        // Track headers width (w-56 = 224px)
+        const trackHeaderWidth = 224;
+
+        // Calculate mouse position relative to timeline content area
+        const mouseXInContainer = currentMouseX - containerRect.left - trackHeaderWidth + scrollLeft;
+
+        // Subtract the grab offset to get the clip's left edge position
+        const clipLeftX = mouseXInContainer - activeDragItem.offsetX;
+
         // Convert pixels to milliseconds
-        const positionMs = Math.max(0, pixelsToMs(positionInTimeline, zoom));
-        
+        const positionMs = Math.max(0, pixelsToMs(clipLeftX, zoom));
+
         setClipDragData({
           activeId: active.id as string,
           positionMs
@@ -162,7 +200,7 @@ function App() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    
+
     const dragItem = active.data.current as DragItem;
 
     console.log('Drag ended:', dragItem);
@@ -177,13 +215,18 @@ function App() {
       return;
     }
 
-    if (!over) return;
+    if (!over) {
+      // Clear drag data even if no valid drop target
+      setClipDragData(null);
+      setActiveDragItem(null);
+      return;
+    }
 
     // Use the tracked position from drag movement, or fall back to over data
     const positionMs = clipDragData?.positionMs ?? (over.data.current as { trackId: string; positionMs: number }).positionMs ?? 0;
-    const dropResult = { 
+    const dropResult = {
       trackId: over.data.current?.trackId,
-      positionMs 
+      positionMs
     };
 
     if (dragItem.type === 'asset' && dropResult.trackId) {
@@ -197,9 +240,10 @@ function App() {
       const deltaMs = dropResult.positionMs - (dragItem.side === 'left' ? 0 : 1000); // Simplified
       trimClip(dragItem.clipId, dragItem.side!, deltaMs);
     }
-    
+
     // Clear drag data
     setClipDragData(null);
+    setActiveDragItem(null);
   };
 
   // Helper to render the active pane
@@ -211,6 +255,94 @@ function App() {
       default:
         return <LeftPane />;
     }
+  };
+
+  // Helper to render drag overlay for clips
+  const renderDragOverlay = () => {
+    if (!activeDragItem) return null;
+
+    const { item, clip } = activeDragItem;
+    const { zoom } = usePlaybackStore.getState();
+
+    // Render clip overlay
+    if (item.type === 'clip' && clip) {
+      const asset = getAssetById(clip.assetId);
+      if (!asset) return null;
+
+      const clipWidth = msToPixels(clip.endMs - clip.startMs, zoom);
+      const getClipIcon = (type: string) => {
+        switch (type) {
+          case 'video': return Play;
+          case 'audio': return Music;
+          case 'image': return Image;
+          default: return Play;
+        }
+      };
+      const Icon = getClipIcon(asset.type);
+
+      return (
+        <div
+          className="timeline-clip cursor-grabbing rounded-sm shadow-2xl bg-linear-to-r from-light-blue/30 to-cyan-500/30 border-2 border-light-blue/50 opacity-90"
+          style={{
+            width: `${Math.max(clipWidth, 20)}px`,
+            height: '112px', // Match track height (h-32 = 128px minus padding)
+          }}
+        >
+          <div className="h-full flex items-center px-sm">
+            <Icon className="h-3 w-3 text-white/70 mr-xs shrink-0" />
+            <span className="text-caption text-white truncate">
+              {asset.name}
+            </span>
+          </div>
+          {clipWidth > 60 && (
+            <div className="absolute bottom-1 right-1 text-caption text-white/70 bg-black/50 px-xs rounded">
+              {formatTimecode(clip.endMs - clip.startMs)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Render asset overlay (from library)
+    if (item.type === 'asset') {
+      const asset = getAssetById(item.id);
+      if (!asset) return null;
+
+      const clipWidth = msToPixels(asset.duration, zoom);
+      const getClipIcon = (type: string) => {
+        switch (type) {
+          case 'video': return Play;
+          case 'audio': return Music;
+          case 'image': return Image;
+          default: return Play;
+        }
+      };
+      const Icon = getClipIcon(asset.type);
+
+      return (
+        <div
+          className="timeline-clip cursor-grabbing rounded-sm shadow-2xl bg-linear-to-r from-light-blue/30 to-cyan-500/30 border-2 border-light-blue/50 opacity-90"
+          style={{
+            width: `${Math.max(clipWidth, 20)}px`,
+            height: '112px',
+          }}
+        >
+          <div className="h-full flex items-center px-sm">
+            <Icon className="h-3 w-3 text-white/70 mr-xs shrink-0" />
+            <span className="text-caption text-white truncate">
+              {asset.name}
+            </span>
+          </div>
+          {clipWidth > 60 && (
+            <div className="absolute bottom-1 right-1 text-caption text-white/70 bg-black/50 px-xs rounded">
+              {formatTimecode(asset.duration)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -249,6 +381,11 @@ function App() {
             <TimelineDock />
           </div>
         </div>
+
+        {/* Drag overlay to show clip following cursor */}
+        <DragOverlay dropAnimation={null}>
+          {renderDragOverlay()}
+        </DragOverlay>
       </DndContext>
     </div>
   );

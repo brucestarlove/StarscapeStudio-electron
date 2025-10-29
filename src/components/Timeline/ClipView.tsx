@@ -14,12 +14,12 @@ interface ClipViewProps {
 export function ClipView({ clip }: ClipViewProps) {
   const { selectedClipIds, selectClip, getAssetById, trimClip } = useProjectStore();
   const { zoom } = usePlaybackStore();
-  
+
   const asset = getAssetById(clip.assetId);
   const isSelected = selectedClipIds.includes(clip.id);
-  
+
   // Trim state - track both start position and last position to calculate incremental deltas
-  const [trimming, setTrimming] = useState<{side: 'left'|'right', startX: number, lastX: number} | null>(null);
+  const [trimming, setTrimming] = useState<{ side: 'left' | 'right', startX: number, lastX: number } | null>(null);
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: clip.id,
@@ -52,7 +52,7 @@ export function ClipView({ clip }: ClipViewProps) {
   };
 
   // Trim handle mouse events
-  const handleTrimStart = (side: 'left'|'right', e: React.MouseEvent) => {
+  const handleTrimStart = (side: 'left' | 'right', e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     setTrimming({ side, startX: e.clientX, lastX: e.clientX });
@@ -65,13 +65,13 @@ export function ClipView({ clip }: ClipViewProps) {
     const handleMove = (e: MouseEvent) => {
       // Calculate incremental delta since last mouse move
       const deltaX = e.clientX - trimming.lastX;
-      
+
       // Convert pixels to milliseconds: zoom is in px/ms, so ms = px / (px/ms)
       const deltaMs = deltaX / zoom;
-      
+
       // Apply the trim
       trimClip(clip.id, trimming.side, deltaMs);
-      
+
       // Update last position for next delta calculation
       setTrimming(prev => prev ? { ...prev, lastX: e.clientX } : null);
     };
@@ -92,9 +92,10 @@ export function ClipView({ clip }: ClipViewProps) {
   return (
     <div
       ref={setNodeRef}
+      data-clip-id={clip.id}
       className={cn(
         "absolute top-2 bottom-2 timeline-clip cursor-pointer rounded-sm shadow-lg",
-        "bg-gradient-to-r from-light-blue/20 to-cyan-500/20 border border-light-blue/30",
+        "bg-linear-to-r from-light-blue/20 to-cyan-500/20 border border-light-blue/30",
         isSelected && "ring-2 ring-light-blue ring-opacity-60 shadow-xl shadow-light-blue/30",
         isDragging && "opacity-50"
       )}
@@ -108,7 +109,7 @@ export function ClipView({ clip }: ClipViewProps) {
     >
       {/* Clip content */}
       <div className="h-full flex items-center px-sm">
-        <Icon className="h-3 w-3 text-white/70 mr-xs flex-shrink-0" />
+        <Icon className="h-3 w-3 text-white/70 mr-xs shrink-0" />
         <span className="text-caption text-white truncate">
           {asset.name}
         </span>
@@ -133,7 +134,7 @@ export function ClipView({ clip }: ClipViewProps) {
             )}
             onMouseDown={(e) => handleTrimStart('left', e)}
           />
-          
+
           {/* Right trim handle */}
           <div
             className={cn(

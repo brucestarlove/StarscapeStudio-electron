@@ -60,12 +60,12 @@ function AssetCard({ asset, onDoubleClick }: AssetCardProps) {
       {/* Thumbnail/Preview Area - Top Half */}
       <div className={cn(
         "aspect-video flex items-center justify-center overflow-hidden relative",
-        "bg-gradient-to-br",
+        "bg-linear-to-br",
         gradientColor
       )}>
         {asset.thumbnailUrl ? (
-          <img 
-            src={asset.thumbnailUrl} 
+          <img
+            src={asset.thumbnailUrl}
             alt={asset.name}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
@@ -77,16 +77,16 @@ function AssetCard({ asset, onDoubleClick }: AssetCardProps) {
           <Icon className="h-10 w-10 text-white/70 group-hover:text-white group-hover:scale-110 transition-all duration-200" />
         )}
       </div>
-      
+
       {/* Asset Info - Bottom Half */}
       <CardContent className="space-y-1.5">
-        <h3 
-          className="text-xs font-medium text-white truncate leading-tight group-hover:text-light-blue transition-colors" 
+        <h3
+          className="text-xs font-medium text-white truncate leading-tight group-hover:text-light-blue transition-colors"
           title={asset.name}
         >
           {asset.name}
         </h3>
-        
+
         <div className="flex items-center gap-1.5">
           {/* Type pill */}
           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/10 text-white/80 capitalize">
@@ -97,7 +97,7 @@ function AssetCard({ asset, onDoubleClick }: AssetCardProps) {
             {formatTimecode(asset.duration)}
           </span>
         </div>
-        
+
         {/* Resolution and file size */}
         <div className="text-[10px] text-white/40 flex items-center gap-2">
           {asset.metadata.width && asset.metadata.height && (
@@ -135,7 +135,7 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
     if (videoTrack) {
       // Create clip and get the returned clipId
       const clipId = createClip(asset.id, videoTrack.id, currentTimeMs);
-      
+
       // Canvas node is already created in createClip action, no need to create again
       console.log(`Created clip ${clipId} for asset ${asset.name}`);
     }
@@ -159,7 +159,7 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
           <Plus className="h-6 w-6 text-light-blue" />
           <span className="text-light-blue font-medium">Upload Media</span>
         </Button>
-        
+
         {assets.length > 0 && (
           <Button
             variant="ghost"

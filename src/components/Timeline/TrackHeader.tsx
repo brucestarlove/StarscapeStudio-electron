@@ -9,7 +9,7 @@ interface TrackHeaderProps {
 
 export function TrackHeader({ trackId }: TrackHeaderProps) {
   const { tracks, getClipsByTrack, updateTrack } = useProjectStore();
-  
+
   const track = tracks.find(t => t.id === trackId);
   const clips = getClipsByTrack(trackId);
 
@@ -35,7 +35,7 @@ export function TrackHeader({ trackId }: TrackHeaderProps) {
 
   return (
     <div className={cn(
-      "h-32 flex flex-col justify-center px-md py-sm bg-gradient-to-r from-mid-navy/80 to-mid-navy/50 border-b border-white/10",
+      "h-32 flex flex-col justify-center px-md py-sm bg-linear-to-r from-mid-navy/80 to-mid-navy/50 border-b border-white/10",
       !track.visible && "opacity-50"
     )}>
       {/* Track name and icon */}
@@ -53,7 +53,7 @@ export function TrackHeader({ trackId }: TrackHeaderProps) {
           {track.name}
         </span>
       </div>
-      
+
       {/* Track controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-xs">
@@ -69,7 +69,7 @@ export function TrackHeader({ trackId }: TrackHeaderProps) {
           >
             <Eye className="h-4 w-4" />
           </Button>
-          
+
           <Button
             variant="ghost"
             size="icon"
@@ -83,7 +83,7 @@ export function TrackHeader({ trackId }: TrackHeaderProps) {
             <Lock className="h-4 w-4" />
           </Button>
         </div>
-        
+
         <div className="text-caption text-white/50">
           {clips.length} {clips.length === 1 ? 'clip' : 'clips'}
         </div>

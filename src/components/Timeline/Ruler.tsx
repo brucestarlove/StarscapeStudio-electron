@@ -51,7 +51,7 @@ export function Ruler() {
 
   return (
     <div
-      className="h-full relative bg-gradient-to-b from-mid-navy/90 to-dark-navy/90 cursor-pointer"
+      className="h-full relative bg-linear-to-b from-mid-navy/90 to-dark-navy/90 cursor-pointer"
       style={{ minWidth: `${minWidth}px` }}
       onClick={handleRulerClick}
       title="Click to seek to position"
@@ -96,7 +96,7 @@ export function Ruler() {
       )}
 
       {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
     </div>
   );
 }
