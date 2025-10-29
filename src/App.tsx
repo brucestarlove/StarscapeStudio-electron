@@ -14,8 +14,9 @@ import type { DragItem } from "@/types";
 import "./globals.css";
 
 function App() {
-  const { createClip, moveClip, trimClip, deleteClip, getSelectedClips } = useProjectStore();
+  const { createClip, moveClip, trimClip, deleteClip, getSelectedClips, splitClip } = useProjectStore();
   const { activeLeftPaneTab } = useUiStore();
+  const { currentTimeMs } = usePlaybackStore();
   const [playheadDragStartX, setPlayheadDragStartX] = useState<number | null>(null);
   const [clipDragData, setClipDragData] = useState<{ activeId: string; positionMs: number } | null>(null);
 
@@ -32,9 +33,10 @@ function App() {
     };
   }, []);
 
-  // Handle Delete key for deleting selected clips
+  // Handle Delete key for deleting selected clips, and 'S' key for splitting clips
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Delete/Backspace handler
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const selectedClips = getSelectedClips();
         if (selectedClips.length > 0) {
@@ -45,13 +47,26 @@ function App() {
           });
         }
       }
+      // Split clip handler (S key)
+      else if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        const selectedClips = getSelectedClips();
+        if (selectedClips.length > 0) {
+          e.preventDefault();
+          const selectedClip = selectedClips[0]; // Split only the first selected clip
+          
+          // Check if playhead is within the selected clip bounds
+          if (currentTimeMs >= selectedClip.startMs && currentTimeMs <= selectedClip.endMs) {
+            splitClip(selectedClip.id, currentTimeMs);
+          }
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [deleteClip, getSelectedClips]);
+  }, [deleteClip, getSelectedClips, currentTimeMs, splitClip]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
