@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragMoveEvent, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { TopBar } from "@/components/TopBar";
 import { LeftRail } from "@/components/LeftRail";
-import { LeftPane } from "@/components/LeftPane/LeftPane";
-import { UtilitiesPane } from "@/components/LeftPane/UtilitiesPane";
+import { LibraryPane } from "@/components/LibraryPane/LibraryPane";
+import { UtilitiesPane } from "@/components/LibraryPane/UtilitiesPane";
 import { Stage } from "@/components/Stage/Stage";
 import { TimelineDock } from "@/components/Timeline/TimelineDock";
 import { useProjectStore } from "@/store/projectStore";
@@ -326,7 +326,7 @@ function App() {
         return <UtilitiesPane />;
       case 'library':
       default:
-        return <LeftPane />;
+        return <LibraryPane />;
     }
   };
 
@@ -439,7 +439,7 @@ function App() {
             <LeftRail />
           </div>
 
-          {/* LeftPane (collapsible) - renders based on active tab */}
+          {/* LibraryPane (collapsible) - renders based on active tab */}
           <div className="col-start-2 row-start-2">
             {renderActivePane()}
           </div>
