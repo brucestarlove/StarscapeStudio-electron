@@ -22,6 +22,10 @@ interface PlaybackStore extends PlaybackState {
   stop: () => void;
   goToStart: () => void;
   goToEnd: () => void;
+  
+  // Audio control
+  setVolume: (volume: number) => void;
+  toggleMute: () => void;
 }
 
 const initialPlaybackState: PlaybackState = {
@@ -29,6 +33,8 @@ const initialPlaybackState: PlaybackState = {
   playing: false,
   zoom: 0.1, // 0.1 pixels per millisecond (100ms = 10px)
   snapEnabled: true,
+  volume: 1.0, // Default full volume
+  isMuted: false, // Default unmuted
 };
 
 export const usePlaybackStore = create<PlaybackStore>()((set) => ({
@@ -99,7 +105,18 @@ export const usePlaybackStore = create<PlaybackStore>()((set) => ({
     // For now, we'll use a placeholder
     set({ currentTimeMs: 60000 }); // 1 minute placeholder
   },
+  
+  // Audio control - update volume with validation
+  setVolume: (volume: number) => {
+    set({ volume: Math.max(0, Math.min(1, volume)) });
+  },
+  
+  // Toggle mute state
+  toggleMute: () => {
+    set((state) => ({ isMuted: !state.isMuted }));
+  },
 }));
 
 // Note: Playback loop is now handled by individual components (Stage.tsx)
 // to avoid conflicts and ensure smooth video synchronization
+// Audio playback is managed by AudioManager singleton

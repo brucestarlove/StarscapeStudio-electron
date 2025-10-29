@@ -21,19 +21,19 @@ export function TimelineDock() {
         </div>
       </div>
 
-      {/* Scrollable tracks area */}
-      <div className="flex-1 flex overflow-hidden bg-gradient-to-b from-dark-navy/50 to-mid-navy/30">
-        {/* Fixed track headers column */}
-        <div className="w-56 flex-shrink-0 overflow-y-auto scrollbar-starscape border-r border-white/10">
-          {tracks.map((track) => (
-            <TrackHeader key={`header-${track.id}`} trackId={track.id} />
-          ))}
-        </div>
+      {/* Scrollable tracks area - headers and tracks together */}
+      <div className="flex-1 overflow-auto scrollbar-starscape bg-gradient-to-b from-dark-navy/50 to-mid-navy/30 relative" id="tracks-scroll">
+        {/* Wide container for timeline */}
+        <div className="flex">
+          {/* Fixed track headers column */}
+          <div className="w-56 flex-shrink-0 border-r border-white/10">
+            {tracks.map((track) => (
+              <TrackHeader key={`header-${track.id}`} trackId={track.id} />
+            ))}
+          </div>
 
-        {/* Scrollable track content area */}
-        <div className="flex-1 overflow-auto scrollbar-starscape relative" id="tracks-scroll">
-          {/* Wide container for timeline */}
-          <div className="relative min-w-[6000px]">
+          {/* Scrollable track content area */}
+          <div className="relative min-w-[6000px] flex-1">
             {/* Playhead - positioned absolutely in this container */}
             <Playhead />
             

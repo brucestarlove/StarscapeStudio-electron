@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, SkipBack, SkipForward, ZoomIn, ZoomOut, Magnet } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, ZoomIn, ZoomOut, Magnet, Volume2, VolumeX } from "lucide-react";
 import { usePlaybackStore } from "@/store/playbackStore";
+import { audioManager } from "@/lib/AudioManager";
 import { formatTimecode } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { useEffect } from "react";
 
 export function TransportControls() {
   const {
@@ -11,15 +13,32 @@ export function TransportControls() {
     currentTimeMs,
     zoom,
     snapEnabled,
+    volume,
+    isMuted,
     togglePlay,
     stepBackward,
     stepForward,
     setZoom,
     toggleSnap,
+    setVolume,
+    toggleMute,
   } = usePlaybackStore();
+
+  // Sync volume and mute state with AudioManager
+  useEffect(() => {
+    audioManager.setVolume(volume);
+  }, [volume]);
+
+  useEffect(() => {
+    audioManager.setMuted(isMuted);
+  }, [isMuted]);
 
   const handleZoomChange = (value: number[]) => {
     setZoom(value[0]);
+  };
+
+  const handleVolumeChange = (value: number[]) => {
+    setVolume(value[0]);
   };
 
   return (
@@ -56,6 +75,42 @@ export function TransportControls() {
         >
           <SkipForward className="h-4 w-4" />
         </Button>
+
+        {/* Audio controls */}
+        <div className="flex items-center space-x-sm ml-md pl-md border-l border-white/10">
+          {/* Mute button */}
+          <Button
+            variant={isMuted ? "default" : "ghost"}
+            size="icon"
+            onClick={toggleMute}
+            className={cn(
+              "text-white",
+              isMuted
+                ? "bg-red-500/20"
+                : "hover:bg-light-blue/20"
+            )}
+            title={isMuted ? "Unmute" : "Mute"}
+          >
+            {isMuted ? (
+              <VolumeX className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </Button>
+
+          {/* Volume slider */}
+          <div className="w-24">
+            <Slider
+              value={[volume]}
+              onValueChange={handleVolumeChange}
+              min={0}
+              max={1}
+              step={0.05}
+              className="w-full"
+              title={`Volume: ${Math.round(volume * 100)}%`}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Center: Timecode */}

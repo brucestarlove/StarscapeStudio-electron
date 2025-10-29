@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog, protocol }
 const path = require('path');
 const fs = require('fs');
 const squirrelStartup = require('electron-squirrel-startup');
+const { shell } = require('electron'); // Added for reveal-in-finder
 
 const { configureFfmpeg } = require('./ffmpeg');
 const { CacheDirs } = require('./cache');
@@ -30,6 +31,7 @@ function createWindow() {
     width: 1400,
     height: 900,
     title: 'Starscape ClipForge',
+    icon: path.join(__dirname, '../build-resources/icons/icon.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -579,6 +581,19 @@ ipcMain.handle('open-file-dialog', async () => {
   } catch (error) {
     console.error('Error opening file dialog:', error);
     throw new Error(`Failed to open file dialog: ${error.message}`);
+  }
+});
+
+/**
+ * Open/reveal file in Finder (macOS), Explorer (Windows), or Files (Linux)
+ */
+ipcMain.handle('reveal-in-finder', async (event, filePath) => {
+  try {
+    shell.showItemInFolder(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error('Error revealing file in finder:', error);
+    throw new Error(`Failed to reveal file: ${error.message}`);
   }
 });
 

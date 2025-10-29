@@ -22,6 +22,7 @@ export interface ExportSettings {
   height?: number;
   fps?: number;
   bitrate?: number;
+  filename?: string;
 }
 
 export interface ExportResult {
@@ -131,6 +132,11 @@ export async function saveBlobToFile(blobData: ArrayBuffer, filePath: string): P
   return window.electronAPI.saveBlobToFile(blobData, filePath);
 }
 
+// Reveal file in Finder/Explorer
+export async function revealInFinder(filePath: string): Promise<{ success: boolean }> {
+  return window.electronAPI.revealInFinder(filePath);
+}
+
 // Type declaration for Electron API
 declare global {
   interface Window {
@@ -148,6 +154,7 @@ declare global {
       onExportProgress: (callback: (event: ProgressEvent) => void) => () => void;
       onStartRecording: (callback: (event: { recordingId: string; sourceId: string; outputPath: string; settings: RecordSettings }) => void) => () => void;
       onStopRecording: (callback: (event: { recordingId: string }) => void) => () => void;
+      revealInFinder: (filePath: string) => Promise<{ success: boolean }>;
     };
   }
 }

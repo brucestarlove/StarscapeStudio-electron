@@ -1,31 +1,27 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, Zap, Download } from "lucide-react";
+import { FolderOpen, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/uiStore";
-
-type RailTab = 'library' | 'effects' | 'export';
+import type { LeftPaneTab } from "@/store/uiStore";
 
 export function LeftRail() {
-  const [activeTab, setActiveTab] = useState<RailTab>('library');
-  const { setLeftPaneCollapsed } = useUiStore();
+  const { setLeftPaneCollapsed, activeLeftPaneTab, setActiveLeftPaneTab } = useUiStore();
 
   const tabs = [
     { id: 'library' as const, icon: FolderOpen, label: 'Library', disabled: false },
-    { id: 'effects' as const, icon: Zap, label: 'Effects', disabled: true },
-    { id: 'export' as const, icon: Download, label: 'Export', disabled: false },
+    { id: 'utilities' as const, icon: Wrench, label: 'Utilities', disabled: false },
   ];
 
-  const handleTabClick = (tabId: RailTab) => {
-    setActiveTab(tabId);
-    if (tabId === 'library') setLeftPaneCollapsed(false);
+  const handleTabClick = (tabId: LeftPaneTab) => {
+    setActiveLeftPaneTab(tabId);
+    setLeftPaneCollapsed(false);
   };
 
   return (
     <nav className="h-full w-full bg-dark-navy border-r border-light-blue/20 flex flex-col items-center py-lg space-y-sm">
       {tabs.map((tab) => {
         const Icon = tab.icon;
-        const isActive = activeTab === tab.id;
+        const isActive = activeLeftPaneTab === tab.id;
         
         return (
           <Button

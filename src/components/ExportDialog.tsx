@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Download, X, CheckCircle } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
-import { exportProject, listenExportProgress, type ExportSettings, type ProgressEvent } from "@/lib/bindings";
+import { exportProject, listenExportProgress, revealInFinder, type ExportSettings, type ProgressEvent } from "@/lib/bindings";
 
 interface ExportDialogProps {
   open: boolean;
@@ -28,6 +28,11 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [exportResult, setExportResult] = useState<{ path: string; success: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filename state - initialize with cleaned project name
+  const [filename, setFilename] = useState<string>(
+    `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_export`
+  );
 
   const handleExport = async () => {
     try {
@@ -97,7 +102,7 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
       });
 
       // Start export
-      const result = await exportProject(projectJson, settings);
+      const result = await exportProject(projectJson, { ...settings, filename });
       
       cleanup();
       setExportResult({ path: result.path, success: true });
@@ -210,10 +215,8 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
               <div className="space-y-sm">
                 <label className="text-body-small text-white/70">Filename</label>
                 <Input
-                  value={`${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_export`}
-                  onChange={() => {
-                    // Filename will be handled by the backend
-                  }}
+                  value={filename}
+                  onChange={(e) => setFilename(e.target.value)}
                   className="bg-white/10 border-white/20 text-white"
                   placeholder="Export filename"
                 />
@@ -295,7 +298,33 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
               </>
             )}
             
-            {(exportResult || error) && (
+            {exportResult && exportResult.success && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleClose}
+                >
+                  Close
+                </Button>
+                <Button
+                  variant="gradient"
+                  onClick={async () => {
+                    try {
+                      // Remove file:// protocol if present
+                      const filePath = exportResult.path.replace(/^file:\/\//, '');
+                      await revealInFinder(filePath);
+                      handleClose();
+                    } catch (err) {
+                      console.error('Failed to reveal in finder:', err);
+                    }
+                  }}
+                >
+                  Open in Finder
+                </Button>
+              </>
+            )}
+            
+            {error && (
               <Button
                 variant="gradient"
                 onClick={handleClose}

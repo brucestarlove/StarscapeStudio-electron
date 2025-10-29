@@ -71,7 +71,7 @@ async function executeExportJob(plan, settings, cache, mainWindow, trackProcessF
   }
 
   const ext = settings.format === 'mov' ? 'mov' : 'mp4';
-  const outPath = cache.renderOutputPath(plan.id, ext);
+  const outPath = settings.filename ? cache.renderOutputPathWithFilename(settings.filename, ext) : cache.renderOutputPath(plan.id, ext);
 
   // Try concat with codec copy
   try {
