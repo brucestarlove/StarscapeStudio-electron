@@ -59,6 +59,15 @@ class CacheDirs {
   }
 
   /**
+   * Get render output path with custom filename
+   */
+  renderOutputPathWithFilename(filename, ext) {
+    // Sanitize filename to remove path separators and invalid characters
+    const sanitizedFilename = filename.replace(/[\/\\:*?"<>|]/g, '_');
+    return path.join(this.renders, `${sanitizedFilename}.${ext}`);
+  }
+
+  /**
    * Get capture output path
    */
   captureOutputPath(ext) {

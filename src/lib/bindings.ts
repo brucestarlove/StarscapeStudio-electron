@@ -22,6 +22,7 @@ export interface ExportSettings {
   height?: number;
   fps?: number;
   bitrate?: number;
+  filename?: string;
 }
 
 export interface ExportResult {
