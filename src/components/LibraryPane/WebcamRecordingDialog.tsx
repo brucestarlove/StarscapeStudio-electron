@@ -116,7 +116,7 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
-        audio: false, // Preview without audio
+        audio: selectedAudioDevice ? { deviceId: { exact: selectedAudioDevice } } : true,
       };
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -150,7 +150,7 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
           height: { ideal: 720 },
           frameRate: { ideal: 30 },
         },
-        audio: false, // Audio not hooked up yet (per requirements)
+        audio: selectedAudioDevice ? { deviceId: { exact: selectedAudioDevice } } : true,
       };
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -165,9 +165,9 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
         });
       }
       
-      // Create MediaRecorder
+      // Create MediaRecorder with video and audio codec
       const recorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9',
+        mimeType: 'video/webm;codecs=vp9,opus',
       });
       
       const chunks: Blob[] = [];
@@ -190,7 +190,7 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
       
     } catch (err) {
       console.error('Failed to start recording:', err);
-      setError('Failed to start recording. Please check camera permissions.');
+      setError('Failed to start recording. Please check camera and microphone permissions.');
     }
   };
 
@@ -308,7 +308,7 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
                     value={selectedVideoDevice}
                     onChange={(e) => setSelectedVideoDevice(e.target.value)}
                     disabled={recordingState === 'recording'}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-light-blue disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-white/10 border border-white/20 text-white/50 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-light-blue disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {videoDevices.length === 0 && (
                       <option value="">No cameras found</option>
@@ -330,7 +330,6 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
                   <select
                     value={selectedAudioDevice}
                     onChange={(e) => setSelectedAudioDevice(e.target.value)}
-                    disabled={true}
                     className="w-full bg-white/10 border border-white/20 text-white/50 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-light-blue disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {audioDevices.length === 0 && (
