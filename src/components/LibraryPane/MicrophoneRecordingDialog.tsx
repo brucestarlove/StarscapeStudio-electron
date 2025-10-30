@@ -344,6 +344,14 @@ export function MicrophoneRecordingDialog({ open, onOpenChange }: MicrophoneReco
                 <Button
                   variant="outline"
                   onClick={async () => {
+                    await revealInFinder(recordingSuccess.path);
+                  }}
+                >
+                  Open in Finder
+                </Button>
+                <Button
+                  variant="gradient"
+                  onClick={async () => {
                     const { addAssetsFromPaths } = useProjectStore.getState();
                     try {
                       await addAssetsFromPaths([recordingSuccess.path]);
@@ -356,14 +364,6 @@ export function MicrophoneRecordingDialog({ open, onOpenChange }: MicrophoneReco
                   }}
                 >
                   Import to Library
-                </Button>
-                <Button
-                  variant="gradient"
-                  onClick={async () => {
-                    await revealInFinder(recordingSuccess.path);
-                  }}
-                >
-                  Open in Finder
                 </Button>
               </div>
             </>
