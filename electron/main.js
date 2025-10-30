@@ -560,22 +560,27 @@ function convertWebmToMp4(inputPath, outputPath) {
 /**
  * Save blob data to file (converts WebM to MP4 for screen recordings)
  */
-ipcMain.handle('save-blob-to-file', async (event, blobData, filePath) => {
+ipcMain.handle('save-blob-to-file', async (event, blobData, filename) => {
   try {
     const fs = require('fs');
+    const path = require('path');
     const buffer = Buffer.from(blobData);
     
-    // Save the blob to the original file path (WebM)
-    await fs.promises.writeFile(filePath, buffer);
-    console.log(`Saved WebM recording to: ${filePath}`);
+    // Construct full path in cache/media directory
+    const webmPath = path.join(cacheDirs.mediaDir, filename);
+    const mp4Filename = filename.replace('.webm', '.mp4');
+    const mp4Path = path.join(cacheDirs.mediaDir, mp4Filename);
+    
+    // Save the blob to the webm file
+    await fs.promises.writeFile(webmPath, buffer);
+    console.log(`Saved WebM recording to: ${webmPath}`);
     
     // Convert WebM to MP4 for better compatibility
-    const mp4Path = filePath.replace('.webm', '.mp4');
-    await convertWebmToMp4(filePath, mp4Path);
+    await convertWebmToMp4(webmPath, mp4Path);
     
     // Delete the original WebM file
-    await fs.promises.unlink(filePath);
-    console.log(`Deleted temporary WebM file: ${filePath}`);
+    await fs.promises.unlink(webmPath);
+    console.log(`Deleted temporary WebM file: ${webmPath}`);
     
     return { success: true, path: mp4Path };
   } catch (error) {

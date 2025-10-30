@@ -5,6 +5,7 @@ import { useProjectStore } from "@/store/projectStore";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle, ChevronLeft } from "lucide-react";
+import { WebcamRecordingDialog } from "./WebcamRecordingDialog";
 
 export function UtilitiesPane() {
   const { setLeftPaneCollapsed, setActiveLeftPaneTab } = useUiStore();
@@ -17,6 +18,9 @@ export function UtilitiesPane() {
   
   // Success modal state
   const [recordingSuccess, setRecordingSuccess] = useState<{ path: string } | null>(null);
+  
+  // Webcam recording dialog state
+  const [webcamDialogOpen, setWebcamDialogOpen] = useState(false);
 
   // Append log message for debugging
   const append = (msg: unknown) => setLogs((l) => l + "\n" + JSON.stringify(msg));
@@ -169,15 +173,20 @@ export function UtilitiesPane() {
               </Button>
             </div>
 
+            {/* Webcam Recording Section */}
+            <div className="space-y-sm">
+              <h3 className="text-sm font-semibold text-white/80">Webcam Recording</h3>
+              <Button
+                onClick={() => setWebcamDialogOpen(true)}
+                className="w-full py-2 bg-gradient-cyan-purple text-white hover:opacity-90 rounded transition-all"
+              >
+                📹 Record Webcam
+              </Button>
+            </div>
+
             {/* Other Utilities (Disabled for now) */}
             <div className="space-y-sm">
               <h3 className="text-sm font-semibold text-white/80">Coming Soon™️</h3>
-              <Button
-                disabled
-                className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
-              >
-                Webcam Recording
-              </Button>
               <Button
                 disabled
                 className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
@@ -203,6 +212,12 @@ export function UtilitiesPane() {
             )}
         </div>
       </div>
+
+      {/* Webcam Recording Dialog */}
+      <WebcamRecordingDialog 
+        open={webcamDialogOpen}
+        onOpenChange={setWebcamDialogOpen}
+      />
 
       {/* Success Modal */}
       {recordingSuccess && (
