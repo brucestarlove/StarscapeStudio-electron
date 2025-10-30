@@ -56,6 +56,12 @@ function buildPlan(projectJsonString) {
         endMs: clip.endMs,
       };
 
+      // Attach asset metadata for aspect ratio preservation (especially for images)
+      if (asset.width && asset.height) {
+        seqClip.assetWidth = asset.width;
+        seqClip.assetHeight = asset.height;
+      }
+
       // Attach canvasNode for overlay tracks (PiP transforms)
       if (track.role === 'overlay' && canvasNodeMap[clipId]) {
         const canvasNode = canvasNodeMap[clipId];

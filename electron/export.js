@@ -88,6 +88,8 @@ async function executeExportJob(plan, settings, cache, mainWindow, trackProcessF
         durationSec, 
         useSourceResolution ? null : targetWidth,
         useSourceResolution ? null : targetHeight,
+        clip.assetWidth,  // Pass asset dimensions for aspect ratio preservation
+        clip.assetHeight,
         settings.bitrate, 
         trackProcessFn
       );
@@ -241,16 +243,18 @@ async function createBlackSegment(outputPath, durationSec, width, height, trackP
 }
 
 /**
- * Convert static image to video segment
+ * Convert static image to video segment with aspect ratio preservation
  * @param {string} inputPath - Input image file path
  * @param {string} outputPath - Output video file path
  * @param {number} durationSec - Duration in seconds
  * @param {number|null} targetWidth - Target width (null for source resolution)
  * @param {number|null} targetHeight - Target height (null for source resolution)
+ * @param {number|null} assetWidth - Original asset width (for aspect ratio calculation)
+ * @param {number|null} assetHeight - Original asset height (for aspect ratio calculation)
  * @param {number} bitrate - Video bitrate in kbps
  * @param {Function} trackProcessFn - Function to track ffmpeg process
  */
-function convertImageToVideoSegment(inputPath, outputPath, durationSec, targetWidth, targetHeight, bitrate, trackProcessFn) {
+function convertImageToVideoSegment(inputPath, outputPath, durationSec, targetWidth, targetHeight, assetWidth, assetHeight, bitrate, trackProcessFn) {
   return new Promise((resolve, reject) => {
     const command = ffmpeg(inputPath)
       .inputOptions([
@@ -259,9 +263,39 @@ function convertImageToVideoSegment(inputPath, outputPath, durationSec, targetWi
       ])
       .duration(durationSec);
 
-    // Apply scaling if target resolution is specified
+    // Apply scaling with aspect ratio preservation if target resolution is specified
     if (targetWidth && targetHeight) {
-      command.size(`${targetWidth}x${targetHeight}`);
+      // If we have asset dimensions, preserve aspect ratio with letterboxing/pillarboxing
+      if (assetWidth && assetHeight && assetWidth > 0 && assetHeight > 0) {
+        const assetAspect = assetWidth / assetHeight;
+        const targetAspect = targetWidth / targetHeight;
+        
+        // Calculate scale to fit within target dimensions while preserving aspect ratio
+        let scaleWidth, scaleHeight;
+        if (assetAspect > targetAspect) {
+          // Image is wider - fit to width
+          scaleWidth = targetWidth;
+          scaleHeight = Math.round(targetWidth / assetAspect);
+        } else {
+          // Image is taller - fit to height
+          scaleHeight = targetHeight;
+          scaleWidth = Math.round(targetHeight * assetAspect);
+        }
+        
+        // Use scale filter with padding to center the image
+        // Format: scale=W:H:force_original_aspect_ratio=decrease,pad=W:H:x:y:color
+        const padX = Math.round((targetWidth - scaleWidth) / 2);
+        const padY = Math.round((targetHeight - scaleHeight) / 2);
+        
+        command
+          .videoFilters([
+            `scale=${scaleWidth}:${scaleHeight}:force_original_aspect_ratio=decrease`,
+            `pad=${targetWidth}:${targetHeight}:${padX}:${padY}:black`
+          ]);
+      } else {
+        // No asset dimensions available - use simple size (may distort)
+        command.size(`${targetWidth}x${targetHeight}`);
+      }
     }
     
     command
