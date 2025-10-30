@@ -127,12 +127,21 @@ export const useProjectStore = create<ProjectStore>()(
             } else if (assetType === 'image') {
               const img = document.createElement('img');
               img.src = url;
-              await new Promise((resolve) => {
+              await new Promise((resolve, reject) => {
                 img.onload = () => {
                   width = img.naturalWidth;
                   height = img.naturalHeight;
                   duration = 5000; // Default 5 seconds for images
+                  console.log(`✅ Image metadata loaded: ${file.name}, ${width}x${height}, duration: ${duration}ms`);
                   resolve(void 0);
+                };
+                img.onerror = (e) => {
+                  console.error(`❌ Failed to load image metadata for ${file.name}:`, e);
+                  // Set defaults even on error
+                  width = 1920;
+                  height = 1080;
+                  duration = 5000;
+                  resolve(void 0); // Don't reject, just use defaults
                 };
               });
             }
@@ -281,14 +290,30 @@ export const useProjectStore = create<ProjectStore>()(
           if (!asset || !track) return;
 
           clipId = generateId();
+          
+          // For images, ensure minimum duration and cap at 60 seconds (60000ms)
+          const defaultImageDuration = 5000; // Default 5 seconds
+          const minClipDuration = 100; // Minimum 100ms for all clips
+          const maxImageDuration = 60000; // Maximum 60 seconds
+          let effectiveDuration = asset.duration;
+          
+          if (asset.type === 'image') {
+            // If duration is 0 or invalid, use default 5 seconds
+            if (!effectiveDuration || effectiveDuration <= 0) {
+              effectiveDuration = defaultImageDuration;
+            }
+            // Ensure minimum and cap at maximum
+            effectiveDuration = Math.max(minClipDuration, Math.min(effectiveDuration, maxImageDuration));
+          }
+          
           const clip: Clip = {
             id: clipId,
             assetId,
             trackId,
             startMs,
-            endMs: startMs + asset.duration,
+            endMs: startMs + effectiveDuration,
             trimStartMs: 0,
-            trimEndMs: asset.duration,
+            trimEndMs: effectiveDuration,
             zIndex: 0,
           };
 
@@ -401,7 +426,9 @@ export const useProjectStore = create<ProjectStore>()(
           const asset = state.assets.find((a: Asset) => a.id === clip.assetId);
           if (!asset) return;
 
-          const minClipDuration = 10; // minimum 10ms
+          // Minimum clip duration: 100ms for all media types (prevents too-short clips)
+          const minClipDuration = 100;
+          const maxImageDuration = 60000; // maximum 60 seconds for images
 
           if (side === 'left') {
             // When trimming left, we adjust both trimStartMs and startMs by the same delta
@@ -442,8 +469,16 @@ export const useProjectStore = create<ProjectStore>()(
             // Calculate new trim end position in the source asset
             let newTrimEnd = clip.trimEndMs + deltaMs;
 
-            // Clamp to valid range [0, asset.duration]
-            newTrimEnd = Math.max(0, Math.min(asset.duration, newTrimEnd));
+            // For images, allow extending beyond initial duration up to max
+            // For videos, clamp to asset duration
+            if (asset.type === 'image') {
+              // Images can be extended from 0 to max duration
+              const maxTrimEnd = clip.trimStartMs + maxImageDuration;
+              newTrimEnd = Math.max(0, Math.min(newTrimEnd, maxTrimEnd));
+            } else {
+              // Videos are clamped to asset duration
+              newTrimEnd = Math.max(0, Math.min(asset.duration, newTrimEnd));
+            }
 
             // Ensure we don't trim past the start (maintain minimum duration)
             newTrimEnd = Math.max(newTrimEnd, clip.trimStartMs + minClipDuration);

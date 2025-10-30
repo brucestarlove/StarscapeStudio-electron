@@ -4,6 +4,7 @@ import { TopBar } from "@/components/TopBar";
 import { LeftRail } from "@/components/LeftRail";
 import { LibraryPane } from "@/components/LibraryPane/LibraryPane";
 import { UtilitiesPane } from "@/components/LibraryPane/UtilitiesPane";
+import { AIPane } from "@/components/LibraryPane/AIPane";
 import { RightRail } from "@/components/RightRail";
 import { TransitionsPane } from "@/components/RightPane/TransitionsPane";
 import { EffectsPane } from "@/components/RightPane/EffectsPane";
@@ -388,6 +389,8 @@ function App() {
     switch (activeLeftPaneTab) {
       case 'utilities':
         return <UtilitiesPane />;
+      case 'ai':
+        return <AIPane />;
       case 'library':
       default:
         return <LibraryPane />;

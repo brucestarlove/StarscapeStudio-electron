@@ -226,15 +226,43 @@ export class CanvasCompositor {
           this.renderFrame();
         }
       };
+      
+      img.onerror = (e) => {
+        console.error(`Failed to load image ${asset.name}:`, e);
+      };
     }
     
     // Only draw if image is fully loaded
-    if (img.complete && img.naturalWidth > 0) {
+    if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
       try {
+        // Calculate aspect ratio preserving dimensions
+        const imageAspect = img.naturalWidth / img.naturalHeight;
+        const canvasAspect = this.canvas.width / this.canvas.height;
+        
+        let drawWidth: number;
+        let drawHeight: number;
+        let drawX: number;
+        let drawY: number;
+        
+        if (imageAspect > canvasAspect) {
+          // Image is wider than canvas - fit to width
+          drawWidth = this.canvas.width;
+          drawHeight = this.canvas.width / imageAspect;
+          drawX = 0;
+          drawY = (this.canvas.height - drawHeight) / 2;
+        } else {
+          // Image is taller than canvas - fit to height
+          drawHeight = this.canvas.height;
+          drawWidth = this.canvas.height * imageAspect;
+          drawX = (this.canvas.width - drawWidth) / 2;
+          drawY = 0;
+        }
+        
+        // Draw image maintaining aspect ratio and centered
         this.ctx.drawImage(
           img,
           0, 0, img.naturalWidth, img.naturalHeight, // Source rectangle
-          0, 0, this.canvas.width, this.canvas.height // Destination rectangle
+          drawX, drawY, drawWidth, drawHeight // Destination rectangle (centered, aspect-preserved)
         );
       } catch (error) {
         console.error(`Error drawing image for ${asset.id}:`, error);

@@ -69,6 +69,11 @@ export interface IngestResult {
   metadata: MediaMeta;
 }
 
+export interface GenerateImageResult {
+  success: boolean;
+  path: string;
+}
+
 // Electron API calls
 export async function getMediaMetadata(path: string): Promise<MediaMeta> {
   return window.electronAPI.getMediaMetadata(path);
@@ -140,6 +145,11 @@ export async function revealInFinder(filePath: string): Promise<{ success: boole
   return window.electronAPI.revealInFinder(filePath);
 }
 
+// Generate cosmic image using AI
+export async function generateCosmicImage(prompt: string): Promise<GenerateImageResult> {
+  return window.electronAPI.generateImage(prompt);
+}
+
 // Type declaration for Electron API
 declare global {
   interface Window {
@@ -158,6 +168,7 @@ declare global {
       onStartRecording: (callback: (event: { recordingId: string; sourceId: string; outputPath: string; settings: RecordSettings }) => void) => () => void;
       onStopRecording: (callback: (event: { recordingId: string }) => void) => () => void;
       revealInFinder: (filePath: string) => Promise<{ success: boolean }>;
+      generateImage: (prompt: string) => Promise<GenerateImageResult>;
     };
   }
 }

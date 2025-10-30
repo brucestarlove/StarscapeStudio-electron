@@ -1,8 +1,13 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const squirrelStartup = require('electron-squirrel-startup');
 const { shell } = require('electron'); // Added for reveal-in-finder
+
+// Load environment variables from .env file
+// Load from project root (one level up from electron directory)
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { configureFfmpeg } = require('./ffmpeg');
 const { CacheDirs } = require('./cache');
@@ -706,6 +711,125 @@ ipcMain.handle('reveal-in-finder', async (event, filePath) => {
   } catch (error) {
     console.error('Error revealing file in finder:', error);
     throw new Error(`Failed to reveal file: ${error.message}`);
+  }
+});
+
+/**
+ * Download image from URL and save to file
+ */
+async function downloadImage(url, outputPath) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(outputPath);
+    
+    https.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`Failed to download image: ${response.statusCode}`));
+        return;
+      }
+      
+      response.pipe(file);
+      
+      file.on('finish', () => {
+        file.close();
+        resolve(outputPath);
+      });
+    }).on('error', (err) => {
+      fs.unlink(outputPath, () => {}); // Delete the file on error
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Generate cosmic image using OpenAI DALL-E API
+ */
+ipcMain.handle('generate-image', async (event, userPrompt) => {
+  try {
+    const apiKey = process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('OpenAI API key not found. Please set VITE_OPENAI_API_KEY or OPENAI_API_KEY environment variable.');
+    }
+
+    // Combine user prompt with cosmic system prompt
+    const fullPrompt = `Create a cosmic/celestial themed image featuring ${userPrompt}. The image should have a space, nebula, starfield, or celestial aesthetic. The style should be artistic and visually striking.`;
+
+    // Call OpenAI DALL-E API
+    const requestData = JSON.stringify({
+      model: 'dall-e-3',
+      prompt: fullPrompt,
+      size: '1024x1024',
+      quality: 'standard',
+      n: 1
+    });
+
+    const options = {
+      hostname: 'api.openai.com',
+      path: '/v1/images/generations',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(requestData)
+      }
+    };
+
+    // Make API request
+    const apiResponse = await new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`OpenAI API error: ${res.statusCode} - ${data}`));
+            return;
+          }
+          
+          try {
+            const json = JSON.parse(data);
+            resolve(json);
+          } catch (error) {
+            reject(new Error(`Failed to parse API response: ${error.message}`));
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        reject(new Error(`API request failed: ${error.message}`));
+      });
+      
+      req.write(requestData);
+      req.end();
+    });
+
+    // Extract image URL from response
+    if (!apiResponse.data || !apiResponse.data[0] || !apiResponse.data[0].url) {
+      throw new Error('Invalid API response: missing image URL');
+    }
+
+    const imageUrl = apiResponse.data[0].url;
+    
+    // Generate filename for saved image
+    const timestamp = Date.now();
+    const filename = `cosmic_${timestamp}.png`;
+    const outputPath = path.join(cacheDirs.mediaDir, filename);
+    
+    // Ensure media directory exists
+    await fs.promises.mkdir(cacheDirs.mediaDir, { recursive: true });
+    
+    // Download and save image
+    await downloadImage(imageUrl, outputPath);
+    
+    console.log(`Generated cosmic image saved to: ${outputPath}`);
+    
+    return { success: true, path: outputPath };
+  } catch (error) {
+    console.error('Error generating image:', error);
+    throw new Error(`Failed to generate image: ${error.message}`);
   }
 });
 

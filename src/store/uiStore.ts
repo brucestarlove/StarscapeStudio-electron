@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type LeftPaneTab = 'library' | 'utilities';
+export type LeftPaneTab = 'library' | 'utilities' | 'ai';
 export type RightPaneTab = 'transitions' | 'effects';
 
 interface UiState {

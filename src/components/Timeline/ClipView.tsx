@@ -131,7 +131,14 @@ export function ClipView({ clip }: ClipViewProps) {
         wouldHitBoundary = newTrimStart <= 0 || newStartMs <= 0;
       } else {
         const newTrimEnd = currentClip.trimEndMs + deltaMs;
-        wouldHitBoundary = newTrimEnd >= currentAsset.duration;
+        // For images, allow extending up to 60 seconds (handled by trimClip)
+        // For videos, check against asset duration
+        if (currentAsset.type === 'image') {
+          const maxImageDuration = 60000;
+          wouldHitBoundary = newTrimEnd >= maxImageDuration;
+        } else {
+          wouldHitBoundary = newTrimEnd >= currentAsset.duration;
+        }
       }
 
       // Apply the trim (trimClip handles minimum durations internally)

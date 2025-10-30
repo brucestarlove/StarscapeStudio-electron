@@ -3,6 +3,15 @@ const fs = require('fs-extra');
 const path = require('path');
 
 /**
+ * Check if file is an image based on extension
+ */
+function isImageFile(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+  return imageExts.includes(ext);
+}
+
+/**
  * Execute export job with progress tracking
  */
 async function executeExportJob(plan, settings, cache, mainWindow, trackProcessFn) {
@@ -67,23 +76,42 @@ async function executeExportJob(plan, settings, cache, mainWindow, trackProcessF
     const startSec = clip.inMs / 1000;
     const durationSec = (clip.outMs - clip.inMs) / 1000;
 
-    // If we need to scale, we must transcode (can't use codec copy)
-    const needsScaling = !useSourceResolution;
-    
-    if (needsScaling) {
-      // Must transcode to apply scaling
-      await trimSegment(clip.srcPath, segPath, startSec, durationSec, false, targetWidth, targetHeight, settings.bitrate, trackProcessFn);
+    // Check if this is an image file
+    const isImage = isImageFile(clip.srcPath);
+
+    if (isImage) {
+      // Convert image to video segment
+      // Images always need transcoding, no codec copy option
+      await convertImageToVideoSegment(
+        clip.srcPath, 
+        segPath, 
+        durationSec, 
+        useSourceResolution ? null : targetWidth,
+        useSourceResolution ? null : targetHeight,
+        settings.bitrate, 
+        trackProcessFn
+      );
       segmentPaths.push(segPath);
     } else {
-      // Try codec copy first for source resolution
-      try {
-        await trimSegment(clip.srcPath, segPath, startSec, durationSec, true, null, null, settings.bitrate, trackProcessFn);
+      // Handle video clips
+      // If we need to scale, we must transcode (can't use codec copy)
+      const needsScaling = !useSourceResolution;
+      
+      if (needsScaling) {
+        // Must transcode to apply scaling
+        await trimSegment(clip.srcPath, segPath, startSec, durationSec, false, targetWidth, targetHeight, settings.bitrate, trackProcessFn);
         segmentPaths.push(segPath);
-      } catch (err) {
-        // Fallback to transcode
-        console.log(`Codec copy failed for segment ${idx}, transcoding...`);
-        await trimSegment(clip.srcPath, segPath, startSec, durationSec, false, null, null, settings.bitrate, trackProcessFn);
-        segmentPaths.push(segPath);
+      } else {
+        // Try codec copy first for source resolution
+        try {
+          await trimSegment(clip.srcPath, segPath, startSec, durationSec, true, null, null, settings.bitrate, trackProcessFn);
+          segmentPaths.push(segPath);
+        } catch (err) {
+          // Fallback to transcode
+          console.log(`Codec copy failed for segment ${idx}, transcoding...`);
+          await trimSegment(clip.srcPath, segPath, startSec, durationSec, false, null, null, settings.bitrate, trackProcessFn);
+          segmentPaths.push(segPath);
+        }
       }
     }
 
@@ -210,6 +238,56 @@ async function createBlackSegment(outputPath, durationSec, width, height, trackP
   
   // All approaches failed
   throw new Error('Failed to create black segment - lavfi not available in FFmpeg build');
+}
+
+/**
+ * Convert static image to video segment
+ * @param {string} inputPath - Input image file path
+ * @param {string} outputPath - Output video file path
+ * @param {number} durationSec - Duration in seconds
+ * @param {number|null} targetWidth - Target width (null for source resolution)
+ * @param {number|null} targetHeight - Target height (null for source resolution)
+ * @param {number} bitrate - Video bitrate in kbps
+ * @param {Function} trackProcessFn - Function to track ffmpeg process
+ */
+function convertImageToVideoSegment(inputPath, outputPath, durationSec, targetWidth, targetHeight, bitrate, trackProcessFn) {
+  return new Promise((resolve, reject) => {
+    const command = ffmpeg(inputPath)
+      .inputOptions([
+        '-loop 1',           // Loop the single image
+        '-framerate 30'      // Output framerate
+      ])
+      .duration(durationSec);
+
+    // Apply scaling if target resolution is specified
+    if (targetWidth && targetHeight) {
+      command.size(`${targetWidth}x${targetHeight}`);
+    }
+    
+    command
+      .videoCodec('libx264')
+      .outputOptions([
+        '-preset veryfast',
+        '-crf 23',
+        `-b:v ${bitrate}k`,
+        '-pix_fmt yuv420p',   // Ensure compatibility
+      ]);
+
+    const ffmpegProcess = command
+      .output(outputPath)
+      .on('end', () => {
+        if (trackProcessFn) trackProcessFn(ffmpegProcess);
+        resolve();
+      })
+      .on('error', (err) => {
+        if (trackProcessFn) trackProcessFn(ffmpegProcess);
+        reject(err);
+      })
+      .run();
+      
+    // Track the process for cleanup
+    if (trackProcessFn) trackProcessFn(ffmpegProcess);
+  });
 }
 
 /**

@@ -47,6 +47,7 @@ export function Stage() {
   }, [canvasRef.current]);
 
   // Load video assets into the pool when they're added to the project
+  // Note: Images are handled separately by CanvasCompositor's image cache
   useEffect(() => {
     const videoAssets = assets.filter(asset => asset.type === 'video');
     
@@ -236,6 +237,9 @@ function getAllVisibleClips(
   // Iterate through all visible tracks
   tracks.forEach((track, trackIndex) => {
     if (!track.visible) return;
+    
+    // Only check video tracks for canvas rendering (not audio tracks)
+    if (track.type !== 'video') return;
     
     // Find all clips on this track that are active at current time
     track.clips.forEach(clipId => {

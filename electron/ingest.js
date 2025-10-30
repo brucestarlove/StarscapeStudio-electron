@@ -128,9 +128,15 @@ async function ingestFiles(filePaths, cache) {
       // Extract metadata
       const metadata = await probeMedia(cachedPath);
 
+      // For images, set default duration to 5 seconds (5000ms)
+      // This can be adjusted in the UI from 250ms to 60 seconds
+      const assetType = getAssetType(filePath, metadata);
+      if (assetType === 'image' && metadata.duration_ms === 0) {
+        metadata.duration_ms = 5000; // Default 5 seconds for images
+      }
+
       // Generate thumbnail
       let thumbnailPath = null;
-      const assetType = getAssetType(filePath, metadata);
       
       try {
         if (assetType === 'video') {
