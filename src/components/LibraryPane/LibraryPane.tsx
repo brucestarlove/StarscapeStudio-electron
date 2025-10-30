@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { LibraryGrid } from "./LibraryGrid";
 import { UploadModal } from "./UploadModal";
 import { useUiStore } from "@/store/uiStore";
-import { ChevronLeft, Trash2, AlertCircle } from "lucide-react";
+import { ChevronLeft, AlertCircle } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -25,21 +25,6 @@ export function LibraryPane() {
         <div className="flex items-center justify-between p-md border-b border-white/10">
           <h2 className="text-h3 font-semibold text-light-blue">Media Library</h2>
           <div className="flex items-center gap-sm">
-            {/* Clear All button - only show if assets exist */}
-            {assets.length > 0 && (
-              <button
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to clear all assets and reset the project? This cannot be undone.')) {
-                    const { clearProject } = useProjectStore.getState();
-                    clearProject();
-                  }
-                }}
-                className="text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors p-1.5 rounded"
-                title="Clear all assets"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
             {/* Collapse button */}
             <button
               onClick={() => setLeftPaneCollapsed(true)}

@@ -256,7 +256,7 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
 
     return (
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl min-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl min-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-h3 font-semibold gradient-text">
               {recordingState === 'success' ? 'Recording Saved' : 'Webcam Recording'}

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, Settings } from "lucide-react";
+import { Download, Settings, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { ExportDialog } from "@/components/ExportDialog";
 
 export function TopBar() {
-  const { projectName, updateProjectName } = useProjectStore();
+  const { projectName, updateProjectName, assets, clearProject } = useProjectStore();
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(projectName);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -34,6 +34,12 @@ export function TopBar() {
 
   const handleExport = () => {
     setExportDialogOpen(true);
+  };
+
+  const handleClearAll = () => {
+    if (window.confirm('Are you sure you want to clear all assets and reset the project? This cannot be undone.')) {
+      clearProject();
+    }
   };
 
   return (
@@ -71,6 +77,17 @@ export function TopBar() {
 
         {/* Right: Actions */}
         <div className="flex items-center space-x-sm">
+          {/* Clear All Assets button - only show if assets exist */}
+          {assets.length > 0 && (
+            <Button
+              onClick={handleClearAll}
+              className="bg-red-600 hover:bg-red-700 text-white flex items-center space-x-sm"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Clear All Assets</span>
+            </Button>
+          )}
+          
           <Button
             variant="ghost"
             size="icon"
@@ -78,7 +95,7 @@ export function TopBar() {
           >
             <Settings className="h-5 w-5" />
           </Button>
-          
+
           <Button
             variant="gradient"
             onClick={handleExport}
