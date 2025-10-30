@@ -35,6 +35,11 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
   const [recordingSuccess, setRecordingSuccess] = useState<{ path: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   
+  // Recording duration
+  const [recordingDuration, setRecordingDuration] = useState<number>(0);
+  const recordingStartTimeRef = useRef<number>(0);
+  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Refs
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
   
@@ -47,9 +52,11 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
       setRecordingState('setup');
       setError(null);
       setRecordingSuccess(null);
+      setRecordingDuration(0);
     } else {
       // Cleanup when dialog closes
       cleanupStream();
+      stopDurationTimer();
     }
   }, [open]);
 
@@ -102,6 +109,30 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
       startPreview();
     }
   }, [selectedVideoDevice, recordingState]);
+
+  // Format duration as MM:SS
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Start duration timer
+  const startDurationTimer = () => {
+    recordingStartTimeRef.current = Date.now();
+    durationIntervalRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000);
+      setRecordingDuration(elapsed);
+    }, 1000);
+  };
+
+  // Stop duration timer
+  const stopDurationTimer = () => {
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
+  };
 
   // Start live preview
   const startPreview = async () => {
@@ -180,6 +211,7 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
       
       recorder.onstop = async () => {
         const blob = new Blob(chunks, { type: 'video/webm' });
+        stopDurationTimer();
         await saveRecording(blob);
       };
       
@@ -187,6 +219,7 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
       setMediaRecorder(recorder);
       recorder.start(1000); // Record in 1-second chunks
       setRecordingState('recording');
+      startDurationTimer();
       
     } catch (err) {
       console.error('Failed to start recording:', err);
@@ -238,6 +271,7 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
     if (videoPreviewRef.current) {
       videoPreviewRef.current.srcObject = null;
     }
+    stopDurationTimer();
   };
 
   // Handle dialog close
@@ -251,6 +285,7 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
       setRecordingSuccess(null);
       setRecordedChunks([]);
       setMediaRecorder(null);
+      setRecordingDuration(0);
     }
   };
 
@@ -295,6 +330,19 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
                   </div>
                 )}
               </div>
+
+              {/* Recording Duration */}
+              {recordingState === 'recording' && (
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="text-4xl font-mono font-bold text-white">
+                    {formatDuration(recordingDuration)}
+                  </div>
+                  <div className="flex items-center space-x-2 text-red-400">
+                    <Circle className="h-2 w-2 fill-current animate-pulse" />
+                    <span className="text-sm font-semibold">Recording</span>
+                  </div>
+                </div>
+              )}
 
               {/* Device Selection */}
               <div className="space-y-md">
@@ -390,11 +438,14 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
                 <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
                 <div>
                   <p className="text-h4 text-white mb-md font-semibold">Recording saved successfully!</p>
-                  <div className="bg-white/5 rounded-lg p-md border border-white/10">
+                  <div className="bg-white/5 rounded-lg p-md border border-white/10 mb-md">
                     <p className="text-caption text-white/70 break-all text-left font-mono">
                       {recordingSuccess.path}
                     </p>
                   </div>
+                  <p className="text-body-small text-white/50">
+                    Duration: {formatDuration(recordingDuration)}
+                  </p>
                 </div>
               </div>
               

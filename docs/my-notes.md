@@ -35,10 +35,10 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 ## remaining for final
 - [x] better trim
 - [x] multiple tracks (main + overlay/PiP)
-- [ ] webm?
+- [x] webm?
 - [x] fix export resolution
 - [x] Webcam recording (access system camera)
-- [ ] Simultaneous screen + webcam (picture-in-picture style)
+- [x] Simultaneous screen + webcam (picture-in-picture style)
 - [x] Audio capture from microphone
 - [x] Record, stop, and save recordings directly to timeline
 - [x] progress indicator during export

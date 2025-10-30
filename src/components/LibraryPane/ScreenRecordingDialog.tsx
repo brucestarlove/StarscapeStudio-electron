@@ -28,6 +28,7 @@ export function ScreenRecordingDialog({ open, onOpenChange }: ScreenRecordingDia
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement>(null);
   
   const { setActiveLeftPaneTab } = useUiStore();
 
@@ -58,6 +59,12 @@ export function ScreenRecordingDialog({ open, onOpenChange }: ScreenRecordingDia
 
           setRecordingStream(stream);
           recordingStreamRef.current = stream;
+
+          // Set up video preview
+          if (videoPreviewRef.current) {
+            videoPreviewRef.current.srcObject = stream;
+            await videoPreviewRef.current.play();
+          }
 
           // Create MediaRecorder
           const recorder = new MediaRecorder(stream, {
@@ -99,6 +106,9 @@ export function ScreenRecordingDialog({ open, onOpenChange }: ScreenRecordingDia
               recordingStreamRef.current.getTracks().forEach(track => track.stop());
               recordingStreamRef.current = null;
               setRecordingStream(null);
+            }
+            if (videoPreviewRef.current) {
+              videoPreviewRef.current.srcObject = null;
             }
             mediaRecorderRef.current = null;
             setMediaRecorder(null);
@@ -207,6 +217,9 @@ export function ScreenRecordingDialog({ open, onOpenChange }: ScreenRecordingDia
       recordingStreamRef.current = null;
       setRecordingStream(null);
     }
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.srcObject = null;
+    }
     if (mediaRecorderRef.current) {
       if (mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
@@ -227,7 +240,7 @@ export function ScreenRecordingDialog({ open, onOpenChange }: ScreenRecordingDia
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg min-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl min-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-h3 font-semibold gradient-text">
             {recordingState === 'success' ? 'Recording Saved' : 'Screen Recording'}
@@ -238,38 +251,47 @@ export function ScreenRecordingDialog({ open, onOpenChange }: ScreenRecordingDia
           {/* Setup / Recording View */}
           {(recordingState === 'setup' || recordingState === 'recording') && (
             <>
-              {/* Recording Visualizer */}
-              <div className="relative bg-gradient-to-br from-mid-navy to-dark-navy rounded-lg overflow-hidden border border-light-blue/20 p-8">
-                <div className="flex flex-col items-center justify-center space-y-6">
-                  {/* Monitor Icon with pulse effect */}
-                  <div className={`relative ${recordingState === 'recording' ? 'animate-pulse' : ''}`}>
-                    <div className={`absolute inset-0 rounded-full ${recordingState === 'recording' ? 'bg-red-500/20 animate-ping' : 'bg-light-blue/10'}`}></div>
-                    <div className={`relative rounded-full p-6 ${recordingState === 'recording' ? 'bg-red-600/20' : 'bg-light-blue/10'}`}>
-                      <Monitor className={`h-12 w-12 ${recordingState === 'recording' ? 'text-red-400' : 'text-light-blue'}`} />
+              {/* Screen Preview */}
+              <div className="relative bg-black rounded-lg overflow-hidden w-full" style={{ aspectRatio: '16/9' }}>
+                <video
+                  ref={videoPreviewRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+                
+                {/* Recording Indicator */}
+                {recordingState === 'recording' && (
+                  <div className="absolute top-4 right-4 flex items-center space-x-2 bg-red-600/90 text-white px-3 py-2 rounded-full">
+                    <Circle className="h-3 w-3 fill-current animate-pulse" />
+                    <span className="text-sm font-semibold">Recording</span>
+                  </div>
+                )}
+                
+                {/* Setup State - No preview */}
+                {recordingState === 'setup' && !recordingStream && (
+                  <div className="absolute inset-0 flex items-center justify-center text-white/50">
+                    <div className="text-center">
+                      <Monitor className="h-16 w-16 mx-auto mb-2 opacity-50" />
+                      <p>Click Start Recording to begin capturing your screen</p>
                     </div>
                   </div>
-                  
-                  {/* Recording Duration */}
-                  {recordingState === 'recording' && (
-                    <div className="flex flex-col items-center space-y-2">
-                      <div className="text-4xl font-mono font-bold text-white">
-                        {formatDuration(recordingDuration)}
-                      </div>
-                      <div className="flex items-center space-x-2 text-red-400">
-                        <Circle className="h-2 w-2 fill-current animate-pulse" />
-                        <span className="text-sm font-semibold">Recording</span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Setup State */}
-                  {recordingState === 'setup' && (
-                    <div className="text-center">
-                      <p className="text-white/70">Click Start Recording to begin capturing your screen</p>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
+
+              {/* Recording Duration */}
+              {recordingState === 'recording' && (
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="text-4xl font-mono font-bold text-white">
+                    {formatDuration(recordingDuration)}
+                  </div>
+                  <div className="flex items-center space-x-2 text-red-400">
+                    <Circle className="h-2 w-2 fill-current animate-pulse" />
+                    <span className="text-sm font-semibold">Recording</span>
+                  </div>
+                </div>
+              )}
 
               {/* Error Message */}
               {error && (

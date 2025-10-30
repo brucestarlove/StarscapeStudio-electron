@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Video, Circle } from "lucide-react";
+import { CheckCircle, Video, Circle, Mic } from "lucide-react";
 import { startScreenRecord, stopScreenRecord, listenStartRecording, listenStopRecording, saveBlobToFile, revealInFinder, deleteFile } from "@/lib/bindings";
 import { useProjectStore } from "@/store/projectStore";
 import { useUiStore } from "@/store/uiStore";
@@ -21,18 +21,17 @@ type RecordingState = 'setup' | 'recording' | 'success';
 export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcamRecordingDialogProps) {
   // Device lists
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   
   // Selected devices
   const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>("");
+  const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>("");
   
   // Recording state
   const [recordingState, setRecordingState] = useState<RecordingState>('setup');
   const [recordingId, setRecordingId] = useState<string>("");
-  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null); // Preview-only webcam stream
-  const [compositeStream, setCompositeStream] = useState<MediaStream | null>(null);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordingSuccess, setRecordingSuccess] = useState<{ path: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   
@@ -46,7 +45,7 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
   const webcamVideoRef = useRef<HTMLVideoElement>(null);
   const webcamPreviewRef = useRef<HTMLVideoElement>(null); // Visible preview element
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null); 
   const isRecordingRef = useRef<boolean>(false);
   const listenersReadyRef = useRef<boolean>(false);
   
@@ -54,6 +53,7 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
   const screenStreamRef = useRef<MediaStream | null>(null);
   const webcamStreamRef = useRef<MediaStream | null>(null);
   const previewStreamRef = useRef<MediaStream | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
   const compositeStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   
@@ -72,7 +72,7 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
     }
   }, [open]);
 
-  // Request permission and enumerate webcam devices
+  // Request permission and enumerate webcam and microphone devices
   const enumerateDevices = async () => {
     try {
       // Request permission first to get device labels
@@ -88,11 +88,22 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
           label: device.label || `Camera ${device.deviceId.slice(0, 8)}`,
         }));
       
-      setVideoDevices(videoInputs);
+      const audioInputs = devices
+        .filter(device => device.kind === 'audioinput')
+        .map(device => ({
+          deviceId: device.deviceId,
+          label: device.label || `Microphone ${device.deviceId.slice(0, 8)}`,
+        }));
       
-      // Auto-select first device
+      setVideoDevices(videoInputs);
+      setAudioDevices(audioInputs);
+      
+      // Auto-select first devices
       if (videoInputs.length > 0) {
         setSelectedVideoDevice(videoInputs[0].deviceId);
+      }
+      if (audioInputs.length > 0) {
+        setSelectedAudioDevice(audioInputs[0].deviceId);
       }
       
       // Stop the initial permission stream
@@ -100,7 +111,7 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
       
     } catch (err) {
       console.error('Failed to enumerate devices:', err);
-      setError('Failed to access camera. Please grant permission and try again.');
+      setError('Failed to access camera/microphone. Please grant permission and try again.');
     }
   };
 
@@ -149,11 +160,17 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
   // Cleanup preview stream
   const cleanupPreview = () => {
     if (previewStreamRef.current) {
-      previewStreamRef.current.getTracks().forEach(track => track.stop());
+      // Stop all tracks in the preview stream
+      previewStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+      });
       previewStreamRef.current = null;
       setPreviewStream(null);
     }
-    // Don't clear preview video element here - let the caller handle it
+    // Clear preview video element srcObject to release the stream
+    if (webcamPreviewRef.current && webcamPreviewRef.current.srcObject) {
+      webcamPreviewRef.current.srcObject = null;
+    }
   };
 
   // Set up recording event listeners
@@ -184,7 +201,6 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
             } as any
           });
 
-          setScreenStream(screenMediaStream);
           screenStreamRef.current = screenMediaStream;
 
           // Set up screen video element
@@ -326,12 +342,41 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
 
           // Create canvas stream for recording
           const canvasStream = canvas.captureStream(30); // 30 FPS
-          setCompositeStream(canvasStream);
-          compositeStreamRef.current = canvasStream;
+          
+          // Get microphone audio stream if selected
+          let audioStream: MediaStream | null = null;
+          if (selectedAudioDevice) {
+            try {
+              audioStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                  deviceId: selectedAudioDevice ? { exact: selectedAudioDevice } : undefined,
+                },
+              });
+              audioStreamRef.current = audioStream;
+            } catch (err) {
+              console.warn('Failed to get microphone stream:', err);
+              // Continue without audio if microphone fails
+            }
+          }
+          
+          // Combine canvas video stream with microphone audio stream
+          const combinedStream = new MediaStream();
+          
+          // Add all video tracks from canvas stream
+          canvasStream.getVideoTracks().forEach(track => {
+            combinedStream.addTrack(track);
+          });
+          
+          // Add audio track from microphone if available
+          if (audioStream && audioStream.getAudioTracks().length > 0) {
+            combinedStream.addTrack(audioStream.getAudioTracks()[0]);
+          }
+          
+          compositeStreamRef.current = combinedStream;
 
-          // Create MediaRecorder with the composite stream
-          const recorder = new MediaRecorder(canvasStream, {
-            mimeType: 'video/webm;codecs=vp9'
+          // Create MediaRecorder with the combined stream (video + audio)
+          const recorder = new MediaRecorder(combinedStream, {
+            mimeType: 'video/webm;codecs=vp9,opus'
           });
 
           const chunks: Blob[] = [];
@@ -376,14 +421,12 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
             if (screenStreamRef.current) {
               screenStreamRef.current.getTracks().forEach(track => track.stop());
               screenStreamRef.current = null;
-              setScreenStream(null);
             }
             
             // Stop composite stream
             if (compositeStreamRef.current) {
               compositeStreamRef.current.getTracks().forEach(track => track.stop());
               compositeStreamRef.current = null;
-              setCompositeStream(null);
             }
             
             // Stop recording webcam stream
@@ -391,6 +434,12 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
               webcamStreamRef.current.getTracks().forEach(track => track.stop());
               webcamStreamRef.current = null;
               setWebcamStream(null);
+            }
+            
+            // Stop microphone audio stream
+            if (audioStreamRef.current) {
+              audioStreamRef.current.getTracks().forEach(track => track.stop());
+              audioStreamRef.current = null;
             }
             
             // Clear all video elements
@@ -409,7 +458,6 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
           };
 
           mediaRecorderRef.current = recorder;
-          setMediaRecorder(recorder);
           
           // Set recording flag BEFORE starting compositing loop
           isRecordingRef.current = true;
@@ -470,8 +518,7 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
   // Cleanup on dialog close
   useEffect(() => {
     if (!open) {
-      // Stop ALL streams including preview - do this FIRST to ensure webcam is released
-      cleanupPreview();
+      // Stop ALL streams (cleanup() already calls cleanupPreview())
       cleanup();
       
       // Clear all state
@@ -482,7 +529,6 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
       setRecordingId("");
       setPreviewStream(null);
       setWebcamStream(null);
-      setScreenStream(null);
       
       // Reset listener ready flag
       listenersReadyRef.current = false;
@@ -571,7 +617,6 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach(track => track.stop());
       screenStreamRef.current = null;
-      setScreenStream(null);
     }
     
     if (webcamStreamRef.current) {
@@ -580,24 +625,26 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
       setWebcamStream(null);
     }
 
+    // Stop microphone audio stream
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach(track => track.stop());
+      audioStreamRef.current = null;
+    }
+
     if (compositeStreamRef.current) {
       compositeStreamRef.current.getTracks().forEach(track => track.stop());
       compositeStreamRef.current = null;
-      setCompositeStream(null);
     }
 
     // Stop ALL webcam streams (both preview and recording)
     cleanupPreview();
 
-    // Clear ALL video elements
+    // Clear video elements (preview is already cleared by cleanupPreview)
     if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = null;
     }
     if (webcamVideoRef.current) {
       webcamVideoRef.current.srcObject = null;
-    }
-    if (webcamPreviewRef.current) {
-      webcamPreviewRef.current.srcObject = null;
     }
 
     // Stop media recorder
@@ -606,7 +653,6 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
         mediaRecorderRef.current.stop();
       }
       mediaRecorderRef.current = null;
-      setMediaRecorder(null);
     }
 
     stopDurationTimer();
@@ -617,6 +663,9 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
     if (recordingState !== 'recording') {
       cleanup();
       onOpenChange(false);
+    } else {
+      // If recording, stop recording first, then cleanup will happen in onstop handler
+      handleStopRecording();
     }
   };
 
@@ -682,6 +731,19 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
                 )}
               </div>
 
+              {/* Recording Duration */}
+              {recordingState === 'recording' && (
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="text-4xl font-mono font-bold text-white">
+                    {formatDuration(recordingDuration)}
+                  </div>
+                  <div className="flex items-center space-x-2 text-red-400">
+                    <Circle className="h-2 w-2 fill-current animate-pulse" />
+                    <span className="text-sm font-semibold">Recording</span>
+                  </div>
+                </div>
+              )}
+
               {/* Device Selection */}
               <div className="space-y-md">
                 {/* Video Device Dropdown */}
@@ -706,20 +768,30 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
                     ))}
                   </select>
                 </div>
-              </div>
-
-              {/* Recording Duration */}
-              {recordingState === 'recording' && (
-                <div className="flex flex-col items-center space-y-2">
-                  <div className="text-4xl font-mono font-bold text-white">
-                    {formatDuration(recordingDuration)}
-                  </div>
-                  <div className="flex items-center space-x-2 text-red-400">
-                    <Circle className="h-2 w-2 fill-current animate-pulse" />
-                    <span className="text-sm font-semibold">Recording</span>
-                  </div>
+                
+                {/* Audio Device Dropdown */}
+                <div className="space-y-sm">
+                  <label className="text-body-small text-white/70 flex items-center space-x-2">
+                    <Mic className="h-4 w-4" />
+                    <span>Microphone</span>
+                  </label>
+                  <select
+                    value={selectedAudioDevice}
+                    onChange={(e) => setSelectedAudioDevice(e.target.value)}
+                    disabled={recordingState === 'recording'}
+                    className="w-full bg-white/10 border border-white/20 text-white/50 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-light-blue disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {audioDevices.length === 0 && (
+                      <option value="">No microphones found</option>
+                    )}
+                    {audioDevices.map((device) => (
+                      <option key={device.deviceId} value={device.deviceId}>
+                        {device.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
+              </div>
 
               {/* Error Message */}
               {error && (
