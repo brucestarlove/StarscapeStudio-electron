@@ -1,6 +1,6 @@
 {
-  "appId": "com.starscape.clipforge",
-  "productName": "Starscape ClipForge",
+  "appId": "com.starscape.studio",
+  "productName": "Starscape Studio",
   "directories": {
     "output": "build",
     "buildResources": "build-resources"

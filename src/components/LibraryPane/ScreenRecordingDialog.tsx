@@ -17,7 +17,7 @@ export function ScreenRecordingDialog({ open, onOpenChange }: ScreenRecordingDia
   // Recording state
   const [recordingState, setRecordingState] = useState<RecordingState>('setup');
   const [recordingId, setRecordingId] = useState<string>("");
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
   const [recordingSuccess, setRecordingSuccess] = useState<{ path: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +126,7 @@ export function ScreenRecordingDialog({ open, onOpenChange }: ScreenRecordingDia
         }
       });
 
-      stopUnlisten = await listenStopRecording((event) => {
+      stopUnlisten = await listenStopRecording(() => {
         try {
           if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();

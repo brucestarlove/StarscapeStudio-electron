@@ -7,7 +7,7 @@ const fs = require('fs-extra');
 class CacheDirs {
   constructor(app) {
     const appDataPath = app.getPath('appData');
-    const appName = 'com.starscape.clipforge';
+    const appName = 'com.starscape.studio';
     
     this.base = path.join(appDataPath, appName, 'cache');
     this.mediaDir = path.join(this.base, 'media');

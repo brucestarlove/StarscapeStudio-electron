@@ -3,7 +3,6 @@ import { LibraryGrid } from "./LibraryGrid";
 import { UploadModal } from "./UploadModal";
 import { useUiStore } from "@/store/uiStore";
 import { ChevronLeft, AlertCircle } from "lucide-react";
-import { useProjectStore } from "@/store/projectStore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -11,7 +10,6 @@ export function LibraryPane() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [duplicateAsset, setDuplicateAsset] = useState<string | null>(null);
   const { leftPaneCollapsed, setLeftPaneCollapsed } = useUiStore();
-  const { assets } = useProjectStore();
 
   // Ensure pane is visible when upload modal is opened
   useEffect(() => {

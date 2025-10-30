@@ -1,10 +1,9 @@
 import { useUiStore } from "@/store/uiStore";
-import { cn } from "@/lib/utils";
 import { ChevronRight, Contrast, Palette, Droplet, Lightbulb, Wind, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function EffectsPane() {
-  const { rightPaneCollapsed, setRightPaneCollapsed } = useUiStore();
+  const { setRightPaneCollapsed } = useUiStore();
 
   // Stub effect data
   const effects = [

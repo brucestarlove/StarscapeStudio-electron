@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CanvasNode } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -48,8 +48,6 @@ export function TransformControls({
   // Convert display coordinates to logical coordinates
   const toLogicalX = (displayX: number) => displayX / scaleX;
   const toLogicalY = (displayY: number) => displayY / scaleY;
-  const toLogicalWidth = (displayWidth: number) => displayWidth / scaleX;
-  const toLogicalHeight = (displayHeight: number) => displayHeight / scaleY;
 
   // Calculate bounding box in display space
   const displayX = toDisplayX(canvasNode.x);

@@ -128,7 +128,7 @@ export const useProjectStore = create<ProjectStore>()(
             } else if (assetType === 'image') {
               const img = document.createElement('img');
               img.src = url;
-              await new Promise((resolve, reject) => {
+              await new Promise((resolve, _reject) => {
                 img.onload = () => {
                   width = img.naturalWidth;
                   height = img.naturalHeight;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { LibraryGrid } from "./LibraryGrid";
-import { UploadModal } from "./UploadModal";
+import { LibraryGrid } from "../LibraryPane/LibraryGrid";
+import { UploadModal } from "../LibraryPane/UploadModal";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/uiStore";
 import { ChevronLeft } from "lucide-react";

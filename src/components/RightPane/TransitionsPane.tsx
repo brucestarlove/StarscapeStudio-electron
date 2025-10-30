@@ -1,10 +1,9 @@
 import { useUiStore } from "@/store/uiStore";
-import { cn } from "@/lib/utils";
 import { ChevronRight, ArrowRightLeft, Blend, Expand, ZoomIn, Split, Grid3x3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function TransitionsPane() {
-  const { rightPaneCollapsed, setRightPaneCollapsed } = useUiStore();
+  const { setRightPaneCollapsed } = useUiStore();
 
   // Stub transition data
   const transitions = [

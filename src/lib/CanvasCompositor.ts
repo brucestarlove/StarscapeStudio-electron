@@ -219,7 +219,7 @@ export class CanvasCompositor {
   /**
    * Render a video clip (full-screen for main track)
    */
-  private renderVideo(clip: Clip, asset: Asset): void {
+  private renderVideo(_clip: Clip, asset: Asset): void {
     if (!this.ctx || !this.canvas) return;
     
     const video = videoPoolManager.getVideo(asset.id);
@@ -251,7 +251,7 @@ export class CanvasCompositor {
   /**
    * Render a video clip with transforms (for PiP tracks)
    */
-  private renderVideoTransformed(clip: Clip, asset: Asset, x: number, y: number): void {
+  private renderVideoTransformed(_clip: Clip, asset: Asset, x: number, y: number): void {
     if (!this.ctx || !this.canvas) return;
     
     const video = videoPoolManager.getVideo(asset.id);
@@ -281,7 +281,7 @@ export class CanvasCompositor {
   /**
    * Render an image clip (full-screen for main track)
    */
-  private renderImage(clip: Clip, asset: Asset): void {
+  private renderImage(_clip: Clip, asset: Asset): void {
     if (!this.ctx || !this.canvas) return;
     
     // Get or create cached image
@@ -346,7 +346,7 @@ export class CanvasCompositor {
   /**
    * Render an image clip with transforms (for PiP tracks)
    */
-  private renderImageTransformed(clip: Clip, asset: Asset, x: number, y: number): void {
+  private renderImageTransformed(_clip: Clip, asset: Asset, x: number, y: number): void {
     if (!this.ctx || !this.canvas) return;
     
     // Get or create cached image

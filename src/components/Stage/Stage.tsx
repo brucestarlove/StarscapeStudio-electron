@@ -10,8 +10,7 @@ import type { Clip, Asset, Track } from "@/types";
 
 export function Stage() {
   const { clips, getAssetById, tracks, assets, getTimelineDuration, getCanvasNodeByClipId, selectedClipIds, updateCanvasNode } = useProjectStore();
-  const { currentTimeMs, playing, seek, pause } = usePlaybackStore();
-  const timelineDuration = getTimelineDuration();
+  const { currentTimeMs, playing } = usePlaybackStore();
 
   // Canvas and compositor refs
   const canvasRef = useRef<HTMLCanvasElement>(null);

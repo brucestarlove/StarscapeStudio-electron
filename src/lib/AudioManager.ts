@@ -1,5 +1,5 @@
 /**
- * Audio Manager for ClipForge
+ * Audio Manager for Starscape Studio
  * 
  * Handles synchronization of audio playback across:
  * - Embedded audio in video clips (via <video> element)

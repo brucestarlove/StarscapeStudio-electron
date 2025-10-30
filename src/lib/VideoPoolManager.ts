@@ -207,7 +207,7 @@ export class VideoPoolManager {
    * Clean up all videos in the pool
    */
   cleanup(): void {
-    this.videos.forEach((video, assetId) => {
+    this.videos.forEach((_video, assetId) => {
       this.unloadVideo(assetId);
     });
     this.videos.clear();

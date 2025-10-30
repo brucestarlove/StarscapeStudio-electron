@@ -35,7 +35,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'Starscape ClipForge',
+    title: 'Starscape Studio',
     icon: path.join(__dirname, '../build-resources/icons/icon.png'),
     webPreferences: {
       nodeIntegration: false,

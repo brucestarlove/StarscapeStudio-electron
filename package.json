@@ -1,14 +1,14 @@
 {
-  "name": "starscape-clipforge-electron",
+  "name": "starscape-studio-electron",
   "description": "A video editing app",
   "author": "Starscape",
   "homepage": "https://starscape.digital",
   "repository": {
     "type": "git",
-    "url": "https://github.com/starscape/clipforge-electron"
+    "url": "https://github.com/brucestarlove/StarscapeStudio-electron"
   },
   "bugs": {
-    "url": "https://github.com/starscape/clipforge-electron/issues"
+    "url": "https://github.com/brucestarlove/StarscapeStudio-electron/issues"
   },
   "keywords": [
     "video",
@@ -23,7 +23,7 @@
     }
   ],
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "commonjs",
   "main": "electron/main.js",
   "scripts": {

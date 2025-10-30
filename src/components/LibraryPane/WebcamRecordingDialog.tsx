@@ -31,7 +31,7 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
   const [recordingState, setRecordingState] = useState<RecordingState>('setup');
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const [, setRecordedChunks] = useState<Blob[]>([]);
   const [recordingSuccess, setRecordingSuccess] = useState<{ path: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   
