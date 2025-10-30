@@ -1,4 +1,4 @@
-import type { Asset, Clip, Track } from '@/types';
+import type { Asset, Clip, Track, CanvasNode } from '@/types';
 import { videoPoolManager } from './VideoPoolManager';
 
 /**
@@ -9,6 +9,7 @@ export interface ClipRenderData {
   asset: Asset;
   track: Track;
   trackIndex: number;
+  canvasNode?: CanvasNode;
 }
 
 /**
@@ -25,6 +26,9 @@ export class CanvasCompositor {
   private currentClips: ClipRenderData[] = [];
   private currentTimeMs: number = 0;
   private isPlaying: boolean = false;
+
+  // Image cache - keep loaded images in memory
+  private imageCache: Map<string, HTMLImageElement> = new Map();
 
   /**
    * Initialize the compositor with a canvas element
@@ -161,60 +165,217 @@ export class CanvasCompositor {
   private renderClip(clipData: ClipRenderData): void {
     if (!this.ctx || !this.canvas) return;
     
-    const { clip, asset } = clipData;
+    const { clip, asset, trackIndex, canvasNode } = clipData;
     
-    if (asset.type === 'video') {
-      this.renderVideo(clip, asset);
-    } else if (asset.type === 'image') {
-      this.renderImage(clip, asset);
+    // Track 1 (Main Track): Render full-screen without transforms
+    if (trackIndex === 0) {
+      if (asset.type === 'video') {
+        this.renderVideo(clip, asset);
+      } else if (asset.type === 'image') {
+        this.renderImage(clip, asset);
+      }
+      return;
+    }
+    
+    // Track 2+ (PiP Tracks): Apply transforms if canvasNode exists
+    if (canvasNode) {
+      this.ctx.save();
+      
+      // Set opacity
+      this.ctx.globalAlpha = canvasNode.opacity;
+      
+      // Apply transforms: Translate → Rotate → Scale
+      // Translate to position
+      this.ctx.translate(canvasNode.x + canvasNode.width / 2, canvasNode.y + canvasNode.height / 2);
+      
+      // Rotate (convert degrees to radians)
+      this.ctx.rotate((canvasNode.rotation * Math.PI) / 180);
+      
+      // Scale based on canvasNode dimensions vs original asset dimensions
+      const originalWidth = asset.metadata.width || this.canvas.width;
+      const originalHeight = asset.metadata.height || this.canvas.height;
+      const scaleX = canvasNode.width / originalWidth;
+      const scaleY = canvasNode.height / originalHeight;
+      this.ctx.scale(scaleX, scaleY);
+      
+      // Render clip centered at origin (since we translated to center)
+      if (asset.type === 'video') {
+        this.renderVideoTransformed(clip, asset, -originalWidth / 2, -originalHeight / 2);
+      } else if (asset.type === 'image') {
+        this.renderImageTransformed(clip, asset, -originalWidth / 2, -originalHeight / 2);
+      }
+      
+      this.ctx.restore();
+    } else {
+      // Fallback: render without transforms if canvasNode missing
+      if (asset.type === 'video') {
+        this.renderVideo(clip, asset);
+      } else if (asset.type === 'image') {
+        this.renderImage(clip, asset);
+      }
     }
   }
 
   /**
-   * Render a video clip
+   * Render a video clip (full-screen for main track)
    */
   private renderVideo(clip: Clip, asset: Asset): void {
     if (!this.ctx || !this.canvas) return;
     
     const video = videoPoolManager.getVideo(asset.id);
     if (!video) {
-      console.warn(`Video not found in pool: ${asset.id}`);
-      return;
+      return; // Video not loaded yet
     }
     
-    if (video.readyState < 2) {
-      console.warn(`Video not ready (readyState=${video.readyState}): ${asset.id}`);
-      return; // Need HAVE_CURRENT_DATA
+    // For drawing, we can accept readyState >= 1 (HAVE_METADATA)
+    // The browser will show the poster frame or first frame
+    if (video.readyState < 1) {
+      return; // Not ready yet
     }
     
-    // Draw video frame to canvas
+    // Draw video frame to canvas (full-screen)
     try {
-      this.ctx.drawImage(
-        video,
-        0, 0, video.videoWidth, video.videoHeight, // Source rectangle
-        0, 0, this.canvas.width, this.canvas.height // Destination rectangle
-      );
+      // If video has dimensions, draw it
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        this.ctx.drawImage(
+          video,
+          0, 0, video.videoWidth, video.videoHeight, // Source rectangle
+          0, 0, this.canvas.width, this.canvas.height // Destination rectangle
+        );
+      }
     } catch (error) {
-      console.error(`Error drawing video frame for ${asset.id}:`, error);
+      // Silently ignore - video might not be ready yet
     }
   }
 
   /**
-   * Render an image clip
+   * Render a video clip with transforms (for PiP tracks)
+   */
+  private renderVideoTransformed(clip: Clip, asset: Asset, x: number, y: number): void {
+    if (!this.ctx || !this.canvas) return;
+    
+    const video = videoPoolManager.getVideo(asset.id);
+    if (!video) {
+      return; // Video not loaded yet
+    }
+    
+    if (video.readyState < 1) {
+      return; // Not ready yet
+    }
+    
+    try {
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        const width = asset.metadata.width || video.videoWidth;
+        const height = asset.metadata.height || video.videoHeight;
+        this.ctx.drawImage(
+          video,
+          0, 0, video.videoWidth, video.videoHeight, // Source rectangle
+          x, y, width, height // Destination rectangle
+        );
+      }
+    } catch (error) {
+      // Silently ignore - video might not be ready yet
+    }
+  }
+
+  /**
+   * Render an image clip (full-screen for main track)
    */
   private renderImage(clip: Clip, asset: Asset): void {
     if (!this.ctx || !this.canvas) return;
     
-    // Create image element if not cached
-    const img = new Image();
-    img.src = asset.url;
+    // Get or create cached image
+    let img = this.imageCache.get(asset.id);
     
-    if (img.complete && img.naturalWidth > 0) {
+    if (!img) {
+      // Create new image and cache it
+      img = new Image();
+      img.src = asset.url;
+      this.imageCache.set(asset.id, img);
+      
+      // Once loaded, trigger a re-render if not playing
+      img.onload = () => {
+        if (!this.isPlaying && this.canvas && this.ctx) {
+          this.renderFrame();
+        }
+      };
+      
+      img.onerror = (e) => {
+        console.error(`Failed to load image ${asset.name}:`, e);
+      };
+    }
+    
+    // Only draw if image is fully loaded
+    if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
       try {
+        // Calculate aspect ratio preserving dimensions
+        const imageAspect = img.naturalWidth / img.naturalHeight;
+        const canvasAspect = this.canvas.width / this.canvas.height;
+        
+        let drawWidth: number;
+        let drawHeight: number;
+        let drawX: number;
+        let drawY: number;
+        
+        if (imageAspect > canvasAspect) {
+          // Image is wider than canvas - fit to width
+          drawWidth = this.canvas.width;
+          drawHeight = this.canvas.width / imageAspect;
+          drawX = 0;
+          drawY = (this.canvas.height - drawHeight) / 2;
+        } else {
+          // Image is taller than canvas - fit to height
+          drawHeight = this.canvas.height;
+          drawWidth = this.canvas.height * imageAspect;
+          drawX = (this.canvas.width - drawWidth) / 2;
+          drawY = 0;
+        }
+        
+        // Draw image maintaining aspect ratio and centered
         this.ctx.drawImage(
           img,
           0, 0, img.naturalWidth, img.naturalHeight, // Source rectangle
-          0, 0, this.canvas.width, this.canvas.height // Destination rectangle
+          drawX, drawY, drawWidth, drawHeight // Destination rectangle (centered, aspect-preserved)
+        );
+      } catch (error) {
+        console.error(`Error drawing image for ${asset.id}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Render an image clip with transforms (for PiP tracks)
+   */
+  private renderImageTransformed(clip: Clip, asset: Asset, x: number, y: number): void {
+    if (!this.ctx || !this.canvas) return;
+    
+    // Get or create cached image
+    let img = this.imageCache.get(asset.id);
+    
+    if (!img) {
+      img = new Image();
+      img.src = asset.url;
+      this.imageCache.set(asset.id, img);
+      
+      img.onload = () => {
+        if (!this.isPlaying && this.canvas && this.ctx) {
+          this.renderFrame();
+        }
+      };
+      
+      img.onerror = (e) => {
+        console.error(`Failed to load image ${asset.name}:`, e);
+      };
+    }
+    
+    if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+      try {
+        const width = asset.metadata.width || img.naturalWidth;
+        const height = asset.metadata.height || img.naturalHeight;
+        this.ctx.drawImage(
+          img,
+          0, 0, img.naturalWidth, img.naturalHeight, // Source rectangle
+          x, y, width, height // Destination rectangle
         );
       } catch (error) {
         console.error(`Error drawing image for ${asset.id}:`, error);
@@ -248,26 +409,20 @@ export class CanvasCompositor {
             const timeDiff = Math.abs(video.currentTime - sourceTimeSeconds);
             if (timeDiff > 0.1) {
               video.currentTime = sourceTimeSeconds;
-              console.log(`📍 Seeking video ${asset.id} to ${sourceTimeSeconds.toFixed(2)}s`);
             }
             
             // Handle play/pause based on current state
-            if (this.isPlaying && video.paused && video.readyState >= 2) {
-              console.log(`▶️  Playing video ${asset.id}`);
+            // Try to play even at readyState 1 - browser will buffer as needed
+            if (this.isPlaying && video.paused) {
               video.play().catch(err => {
                 if (err.name !== 'AbortError') {
                   console.error(`Play error for ${asset.id}:`, err);
                 }
               });
             } else if (!this.isPlaying && !video.paused) {
-              console.log(`⏸️  Pausing video ${asset.id}`);
               video.pause();
             }
-          } else {
-            console.warn(`⏳ Video ${asset.id} not ready yet (readyState=${video.readyState})`);
           }
-        } else {
-          console.warn(`❌ Video ${asset.id} not found in pool`);
         }
       }
     }
@@ -285,6 +440,7 @@ export class CanvasCompositor {
     this.canvas = null;
     this.ctx = null;
     this.currentClips = [];
+    this.imageCache.clear();
   }
 }
 

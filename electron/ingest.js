@@ -50,15 +50,25 @@ async function generateImageThumbnail(imagePath, outputPath) {
 }
 
 /**
- * Determine asset type from file extension
+ * Determine asset type from file extension and metadata
  */
-function getAssetType(filePath) {
+function getAssetType(filePath, metadata = null) {
   const ext = path.extname(filePath).toLowerCase();
-  const videoExts = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
+  const videoExts = ['.mp4', '.mov', '.avi', '.mkv', '.m4v'];
   const audioExts = ['.mp3', '.wav', '.aac', '.flac', '.ogg', '.m4a'];
   const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
   
+  // WebM can be either video or audio - check metadata if available
+  if (ext === '.webm' && metadata) {
+    // If there's no video codec or no width/height, it's audio-only
+    if (!metadata.codec_video || !metadata.width || !metadata.height) {
+      return 'audio';
+    }
+    return 'video';
+  }
+  
   if (videoExts.includes(ext)) return 'video';
+  if (ext === '.webm') return 'video'; // Default to video if no metadata
   if (audioExts.includes(ext)) return 'audio';
   if (imageExts.includes(ext)) return 'image';
   return 'unknown';
@@ -118,9 +128,15 @@ async function ingestFiles(filePaths, cache) {
       // Extract metadata
       const metadata = await probeMedia(cachedPath);
 
+      // For images, set default duration to 5 seconds (5000ms)
+      // This can be adjusted in the UI from 250ms to 60 seconds
+      const assetType = getAssetType(filePath, metadata);
+      if (assetType === 'image' && metadata.duration_ms === 0) {
+        metadata.duration_ms = 5000; // Default 5 seconds for images
+      }
+
       // Generate thumbnail
       let thumbnailPath = null;
-      const assetType = getAssetType(filePath);
       
       try {
         if (assetType === 'video') {

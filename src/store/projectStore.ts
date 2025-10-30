@@ -46,6 +46,7 @@ interface ProjectStore extends ProjectState {
   getClipsByTrack: (trackId: string) => Clip[];
   getSelectedClips: () => Clip[];
   getAssetById: (assetId: string) => Asset | undefined;
+  getCanvasNodeByClipId: (clipId: string) => CanvasNode | undefined;
   getTimelineDuration: () => number;
 }
 
@@ -127,12 +128,21 @@ export const useProjectStore = create<ProjectStore>()(
             } else if (assetType === 'image') {
               const img = document.createElement('img');
               img.src = url;
-              await new Promise((resolve) => {
+              await new Promise((resolve, reject) => {
                 img.onload = () => {
                   width = img.naturalWidth;
                   height = img.naturalHeight;
                   duration = 5000; // Default 5 seconds for images
+                  console.log(`✅ Image metadata loaded: ${file.name}, ${width}x${height}, duration: ${duration}ms`);
                   resolve(void 0);
+                };
+                img.onerror = (e) => {
+                  console.error(`❌ Failed to load image metadata for ${file.name}:`, e);
+                  // Set defaults even on error
+                  width = 1920;
+                  height = 1080;
+                  duration = 5000;
+                  resolve(void 0); // Don't reject, just use defaults
                 };
               });
             }
@@ -281,32 +291,104 @@ export const useProjectStore = create<ProjectStore>()(
           if (!asset || !track) return;
 
           clipId = generateId();
+          
+          // For images, ensure minimum duration and cap at 60 seconds (60000ms)
+          const defaultImageDuration = 5000; // Default 5 seconds
+          const minClipDuration = 100; // Minimum 100ms for all clips
+          const maxImageDuration = 60000; // Maximum 60 seconds
+          let effectiveDuration = asset.duration;
+          
+          if (asset.type === 'image') {
+            // If duration is 0 or invalid, use default 5 seconds
+            if (!effectiveDuration || effectiveDuration <= 0) {
+              effectiveDuration = defaultImageDuration;
+            }
+            // Ensure minimum and cap at maximum
+            effectiveDuration = Math.max(minClipDuration, Math.min(effectiveDuration, maxImageDuration));
+          }
+          
           const clip: Clip = {
             id: clipId,
             assetId,
             trackId,
             startMs,
-            endMs: startMs + asset.duration,
+            endMs: startMs + effectiveDuration,
             trimStartMs: 0,
-            trimEndMs: asset.duration,
+            trimEndMs: effectiveDuration,
             zIndex: 0,
           };
 
           state.clips[clipId] = clip;
           track.clips.push(clipId);
 
-          // Create canvas node
+          // Create canvas node based on track position
+          // Find first video track to determine if this is Track 1 (Main Track)
+          const firstVideoTrack = state.tracks.find((t: Track) => t.type === 'video');
+          const isMainTrack = track.type === 'video' && track.id === firstVideoTrack?.id;
+          
           const nodeId = generateId();
-          state.canvasNodes[nodeId] = {
-            id: nodeId,
-            clipId,
-            x: 0,
-            y: 0,
-            width: 200,
-            height: 150,
-            rotation: 0,
-            opacity: 1,
-          };
+          
+          if (isMainTrack) {
+            // Track 1 (Main Track): Full canvas dimensions
+            state.canvasNodes[nodeId] = {
+              id: nodeId,
+              clipId,
+              x: 0,
+              y: 0,
+              width: 1920,
+              height: 1080,
+              rotation: 0,
+              opacity: 1,
+            };
+          } else if (track.type === 'video') {
+            // Track 2+ (PiP Tracks): Default PiP size and position
+            // Calculate dimensions preserving asset aspect ratio
+            const defaultMaxWidth = 480;
+            const defaultMaxHeight = 270;
+            const padding = 40;
+            
+            let pipWidth = defaultMaxWidth;
+            let pipHeight = defaultMaxHeight;
+            
+            // If asset has dimensions, preserve aspect ratio
+            if (asset.metadata.width && asset.metadata.height && asset.metadata.width > 0 && asset.metadata.height > 0) {
+              const assetAspect = asset.metadata.width / asset.metadata.height;
+              const defaultAspect = defaultMaxWidth / defaultMaxHeight;
+              
+              if (assetAspect > defaultAspect) {
+                // Asset is wider - fit to width
+                pipWidth = defaultMaxWidth;
+                pipHeight = defaultMaxWidth / assetAspect;
+              } else {
+                // Asset is taller - fit to height
+                pipHeight = defaultMaxHeight;
+                pipWidth = defaultMaxHeight * assetAspect;
+              }
+            }
+            
+            state.canvasNodes[nodeId] = {
+              id: nodeId,
+              clipId,
+              x: 1920 - pipWidth - padding, // Bottom-right with padding
+              y: 1080 - pipHeight - padding,
+              width: pipWidth,
+              height: pipHeight,
+              rotation: 0,
+              opacity: 1,
+            };
+          } else {
+            // Audio tracks or other types: Default small size
+            state.canvasNodes[nodeId] = {
+              id: nodeId,
+              clipId,
+              x: 0,
+              y: 0,
+              width: 200,
+              height: 150,
+              rotation: 0,
+              opacity: 1,
+            };
+          }
         });
         return clipId;
       },
@@ -333,7 +415,14 @@ export const useProjectStore = create<ProjectStore>()(
 
           // Remove clip and canvas node
           delete state.clips[clipId];
-          delete state.canvasNodes[clipId];
+          
+          // Find and delete canvas node by clipId
+          const canvasNode = Object.values(state.canvasNodes).find(
+            (node: CanvasNode) => node.clipId === clipId
+          );
+          if (canvasNode) {
+            delete state.canvasNodes[canvasNode.id];
+          }
 
           // Remove from selection
           state.selectedClipIds = state.selectedClipIds.filter((id: string) => id !== clipId);
@@ -401,7 +490,9 @@ export const useProjectStore = create<ProjectStore>()(
           const asset = state.assets.find((a: Asset) => a.id === clip.assetId);
           if (!asset) return;
 
-          const minClipDuration = 10; // minimum 10ms
+          // Minimum clip duration: 100ms for all media types (prevents too-short clips)
+          const minClipDuration = 100;
+          const maxImageDuration = 60000; // maximum 60 seconds for images
 
           if (side === 'left') {
             // When trimming left, we adjust both trimStartMs and startMs by the same delta
@@ -442,8 +533,16 @@ export const useProjectStore = create<ProjectStore>()(
             // Calculate new trim end position in the source asset
             let newTrimEnd = clip.trimEndMs + deltaMs;
 
-            // Clamp to valid range [0, asset.duration]
-            newTrimEnd = Math.max(0, Math.min(asset.duration, newTrimEnd));
+            // For images, allow extending beyond initial duration up to max
+            // For videos, clamp to asset duration
+            if (asset.type === 'image') {
+              // Images can be extended from 0 to max duration
+              const maxTrimEnd = clip.trimStartMs + maxImageDuration;
+              newTrimEnd = Math.max(0, Math.min(newTrimEnd, maxTrimEnd));
+            } else {
+              // Videos are clamped to asset duration
+              newTrimEnd = Math.max(0, Math.min(asset.duration, newTrimEnd));
+            }
 
             // Ensure we don't trim past the start (maintain minimum duration)
             newTrimEnd = Math.max(newTrimEnd, clip.trimStartMs + minClipDuration);
@@ -495,18 +594,37 @@ export const useProjectStore = create<ProjectStore>()(
 
           state.clips[newClipId] = newClip;
 
-          // Create canvas node for new clip
+          // Create canvas node for new clip, inheriting from parent clip
+          const parentCanvasNode = Object.values(state.canvasNodes).find(
+            (node: CanvasNode) => node.clipId === clipId
+          );
+          
           const nodeId = generateId();
-          state.canvasNodes[nodeId] = {
-            id: nodeId,
-            clipId: newClipId,
-            x: 0,
-            y: 0,
-            width: 200,
-            height: 150,
-            rotation: 0,
-            opacity: 1,
-          };
+          if (parentCanvasNode) {
+            // Inherit parent's transform properties
+            state.canvasNodes[nodeId] = {
+              id: nodeId,
+              clipId: newClipId,
+              x: parentCanvasNode.x,
+              y: parentCanvasNode.y,
+              width: parentCanvasNode.width,
+              height: parentCanvasNode.height,
+              rotation: parentCanvasNode.rotation,
+              opacity: parentCanvasNode.opacity,
+            };
+          } else {
+            // Fallback to defaults if parent node not found
+            state.canvasNodes[nodeId] = {
+              id: nodeId,
+              clipId: newClipId,
+              x: 0,
+              y: 0,
+              width: 200,
+              height: 150,
+              rotation: 0,
+              opacity: 1,
+            };
+          }
         });
       },
 
@@ -623,6 +741,13 @@ export const useProjectStore = create<ProjectStore>()(
       getAssetById: (assetId: string) => {
         const state = get();
         return state.assets.find((asset: Asset) => asset.id === assetId);
+      },
+
+      getCanvasNodeByClipId: (clipId: string) => {
+        const state = get();
+        return Object.values(state.canvasNodes).find(
+          (node: CanvasNode) => node.clipId === clipId
+        );
       },
 
       getTimelineDuration: () => {

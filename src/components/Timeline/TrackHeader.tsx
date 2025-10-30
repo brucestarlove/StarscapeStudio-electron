@@ -15,6 +15,10 @@ export function TrackHeader({ trackId }: TrackHeaderProps) {
 
   if (!track) return null;
 
+  // Check if this is the first video track (Main Track)
+  const firstVideoTrack = tracks.find(t => t.type === 'video');
+  const isMainTrack = track.type === 'video' && track.id === firstVideoTrack?.id;
+
   const getTrackIcon = (type: string) => {
     switch (type) {
       case 'video': return Eye;
@@ -52,6 +56,12 @@ export function TrackHeader({ trackId }: TrackHeaderProps) {
         <span className="text-body text-white font-semibold truncate flex-1">
           {track.name}
         </span>
+        {/* MAIN badge for Track 1 */}
+        {isMainTrack && (
+          <span className="px-xs py-xs text-caption font-bold bg-gradient-to-r from-light-blue to-purple bg-clip-text text-transparent border border-light-blue/30 rounded-sm">
+            MAIN
+          </span>
+        )}
       </div>
 
       {/* Track controls */}

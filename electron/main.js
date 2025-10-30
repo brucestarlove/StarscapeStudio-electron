@@ -1,8 +1,13 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const squirrelStartup = require('electron-squirrel-startup');
 const { shell } = require('electron'); // Added for reveal-in-finder
+
+// Load environment variables from .env file
+// Load from project root (one level up from electron directory)
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { configureFfmpeg } = require('./ffmpeg');
 const { CacheDirs } = require('./cache');
@@ -558,26 +563,85 @@ function convertWebmToMp4(inputPath, outputPath) {
 }
 
 /**
- * Save blob data to file (converts WebM to MP4 for screen recordings)
+ * Convert WebM audio to MP3 using ffmpeg
  */
-ipcMain.handle('save-blob-to-file', async (event, blobData, filePath) => {
+function convertWebmToMp3(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = require('fluent-ffmpeg');
+    
+    console.log(`Converting WebM audio to MP3: ${inputPath} -> ${outputPath}`);
+    
+    const command = ffmpeg(inputPath)
+      .audioCodec('libmp3lame')
+      .audioBitrate('192k')
+      .audioChannels(2)
+      .audioFrequency(44100)
+      .output(outputPath)
+      .on('start', (commandLine) => {
+        console.log('FFmpeg command:', commandLine);
+      })
+      .on('progress', (progress) => {
+        if (progress.percent) {
+          console.log(`Conversion progress: ${Math.round(progress.percent)}%`);
+        }
+      })
+      .on('end', () => {
+        console.log('WebM to MP3 conversion completed');
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error('Conversion error:', err);
+        reject(new Error(`FFmpeg audio conversion failed: ${err.message}`));
+      });
+    
+    // Track the process
+    const process = command.run();
+    trackProcess(process);
+  });
+}
+
+/**
+ * Save blob data to file (converts WebM to MP4 for video, MP3 for audio)
+ */
+ipcMain.handle('save-blob-to-file', async (event, blobData, filename) => {
   try {
     const fs = require('fs');
+    const path = require('path');
     const buffer = Buffer.from(blobData);
     
-    // Save the blob to the original file path (WebM)
-    await fs.promises.writeFile(filePath, buffer);
-    console.log(`Saved WebM recording to: ${filePath}`);
+    // Construct full path in cache/media directory
+    const webmPath = path.join(cacheDirs.mediaDir, filename);
     
-    // Convert WebM to MP4 for better compatibility
-    const mp4Path = filePath.replace('.webm', '.mp4');
-    await convertWebmToMp4(filePath, mp4Path);
+    // Save the blob to the webm file
+    await fs.promises.writeFile(webmPath, buffer);
+    console.log(`Saved WebM recording to: ${webmPath}`);
     
-    // Delete the original WebM file
-    await fs.promises.unlink(filePath);
-    console.log(`Deleted temporary WebM file: ${filePath}`);
-    
-    return { success: true, path: mp4Path };
+    // Check if it's a microphone recording (audio-only) by filename
+    if (filename.startsWith('microphone_recording_')) {
+      // For audio recordings, convert to MP3
+      const mp3Filename = filename.replace('.webm', '.mp3');
+      const mp3Path = path.join(cacheDirs.mediaDir, mp3Filename);
+      
+      await convertWebmToMp3(webmPath, mp3Path);
+      
+      // Delete the original WebM file
+      await fs.promises.unlink(webmPath);
+      console.log(`Deleted temporary WebM file: ${webmPath}`);
+      
+      return { success: true, path: mp3Path };
+    } else {
+      // For video recordings (webcam/screen), convert to MP4
+      const mp4Filename = filename.replace('.webm', '.mp4');
+      const mp4Path = path.join(cacheDirs.mediaDir, mp4Filename);
+      
+      await convertWebmToMp4(webmPath, mp4Path);
+      
+      // Delete the original WebM file
+      await fs.promises.unlink(webmPath);
+      console.log(`Deleted temporary WebM file: ${webmPath}`);
+      
+      return { success: true, path: mp4Path };
+    }
   } catch (error) {
     throw new Error(`Failed to save blob to file: ${error.message}`);
   }
@@ -647,6 +711,145 @@ ipcMain.handle('reveal-in-finder', async (event, filePath) => {
   } catch (error) {
     console.error('Error revealing file in finder:', error);
     throw new Error(`Failed to reveal file: ${error.message}`);
+  }
+});
+
+/**
+ * Delete a file
+ */
+ipcMain.handle('delete-file', async (event, filePath) => {
+  try {
+    const fs = require('fs');
+    await fs.promises.unlink(filePath);
+    console.log(`Deleted file: ${filePath}`);
+    return { success: true };
+  } catch (error) {
+    // If file doesn't exist, consider it a success
+    if (error.code === 'ENOENT') {
+      console.log(`File already deleted: ${filePath}`);
+      return { success: true };
+    }
+    console.error('Error deleting file:', error);
+    throw new Error(`Failed to delete file: ${error.message}`);
+  }
+});
+
+/**
+ * Download image from URL and save to file
+ */
+async function downloadImage(url, outputPath) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(outputPath);
+    
+    https.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`Failed to download image: ${response.statusCode}`));
+        return;
+      }
+      
+      response.pipe(file);
+      
+      file.on('finish', () => {
+        file.close();
+        resolve(outputPath);
+      });
+    }).on('error', (err) => {
+      fs.unlink(outputPath, () => {}); // Delete the file on error
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Generate cosmic image using OpenAI DALL-E API
+ */
+ipcMain.handle('generate-image', async (event, userPrompt) => {
+  try {
+    const apiKey = process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('OpenAI API key not found. Please set VITE_OPENAI_API_KEY or OPENAI_API_KEY environment variable.');
+    }
+
+    // Combine user prompt with cosmic system prompt
+    const fullPrompt = `Create a cosmic/celestial themed image featuring ${userPrompt}. The image should have a space, nebula, starfield, or celestial aesthetic. The style should be artistic and visually striking.`;
+
+    // Call OpenAI DALL-E API
+    const requestData = JSON.stringify({
+      model: 'dall-e-3',
+      prompt: fullPrompt,
+      size: '1024x1024',
+      quality: 'standard',
+      n: 1
+    });
+
+    const options = {
+      hostname: 'api.openai.com',
+      path: '/v1/images/generations',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(requestData)
+      }
+    };
+
+    // Make API request
+    const apiResponse = await new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`OpenAI API error: ${res.statusCode} - ${data}`));
+            return;
+          }
+          
+          try {
+            const json = JSON.parse(data);
+            resolve(json);
+          } catch (error) {
+            reject(new Error(`Failed to parse API response: ${error.message}`));
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        reject(new Error(`API request failed: ${error.message}`));
+      });
+      
+      req.write(requestData);
+      req.end();
+    });
+
+    // Extract image URL from response
+    if (!apiResponse.data || !apiResponse.data[0] || !apiResponse.data[0].url) {
+      throw new Error('Invalid API response: missing image URL');
+    }
+
+    const imageUrl = apiResponse.data[0].url;
+    
+    // Generate filename for saved image
+    const timestamp = Date.now();
+    const filename = `cosmic_${timestamp}.png`;
+    const outputPath = path.join(cacheDirs.mediaDir, filename);
+    
+    // Ensure media directory exists
+    await fs.promises.mkdir(cacheDirs.mediaDir, { recursive: true });
+    
+    // Download and save image
+    await downloadImage(imageUrl, outputPath);
+    
+    console.log(`Generated cosmic image saved to: ${outputPath}`);
+    
+    return { success: true, path: outputPath };
+  } catch (error) {
+    console.error('Error generating image:', error);
+    throw new Error(`Failed to generate image: ${error.message}`);
   }
 });
 

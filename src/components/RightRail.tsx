@@ -5,7 +5,7 @@ import { useUiStore } from "@/store/uiStore";
 import type { RightPaneTab } from "@/store/uiStore";
 
 export function RightRail() {
-  const { setRightPaneCollapsed, activeRightPaneTab, setActiveRightPaneTab } = useUiStore();
+  const { rightPaneCollapsed, setRightPaneCollapsed, activeRightPaneTab, setActiveRightPaneTab } = useUiStore();
 
   const tabs = [
     { id: 'transitions' as const, icon: Sparkles, label: 'Transitions', disabled: false },
@@ -13,8 +13,14 @@ export function RightRail() {
   ];
 
   const handleTabClick = (tabId: RightPaneTab) => {
-    setActiveRightPaneTab(tabId);
-    setRightPaneCollapsed(false);
+    // If clicking the active tab and pane is expanded, collapse it
+    if (activeRightPaneTab === tabId && !rightPaneCollapsed) {
+      setRightPaneCollapsed(true);
+    } else {
+      // Otherwise, set as active tab and expand pane
+      setActiveRightPaneTab(tabId);
+      setRightPaneCollapsed(false);
+    }
   };
 
   return (

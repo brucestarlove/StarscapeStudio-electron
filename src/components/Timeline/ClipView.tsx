@@ -18,8 +18,17 @@ export function ClipView({ clip }: ClipViewProps) {
   const asset = getAssetById(clip.assetId);
   const isSelected = selectedClipIds.includes(clip.id);
 
-  // Trim state - track both start position and last position to calculate incremental deltas
-  const [trimming, setTrimming] = useState<{ side: 'left' | 'right', startX: number, lastX: number } | null>(null);
+  // Trim state - track start position, last position, and boundary state
+  // maxDragDistance tracks the farthest we've dragged in either direction
+  // When dragging beyond boundaries, we need to drag back past the original point before trimming resumes
+  const [trimming, setTrimming] = useState<{
+    side: 'left' | 'right';
+    startX: number;
+    lastX: number;
+    maxDragDistance: number; // positive = right, negative = left
+    beyondBoundary: boolean; // true if we've hit a boundary limit
+    boundaryX: number; // the X position where we hit the boundary
+  } | null>(null);
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: clip.id,
@@ -55,7 +64,14 @@ export function ClipView({ clip }: ClipViewProps) {
   const handleTrimStart = (side: 'left' | 'right', e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    setTrimming({ side, startX: e.clientX, lastX: e.clientX });
+    setTrimming({
+      side,
+      startX: e.clientX,
+      lastX: e.clientX,
+      maxDragDistance: 0,
+      beyondBoundary: false,
+      boundaryX: e.clientX,
+    });
   };
 
   // Global mouse handlers for trimming
@@ -63,17 +79,82 @@ export function ClipView({ clip }: ClipViewProps) {
     if (!trimming) return;
 
     const handleMove = (e: MouseEvent) => {
+      // Calculate total distance from start
+      const totalDragDistance = e.clientX - trimming.startX;
+      
       // Calculate incremental delta since last mouse move
       const deltaX = e.clientX - trimming.lastX;
+      
+      // Track if we're dragging further out than we've been before
+      const isDraggingFurtherOut = Math.abs(totalDragDistance) > Math.abs(trimming.maxDragDistance);
+      
+      // If we're currently beyond the boundary
+      if (trimming.beyondBoundary) {
+        // Check if we've dragged back past the boundary point
+        const draggedBackPastBoundary = trimming.side === 'left'
+          ? e.clientX > trimming.boundaryX
+          : e.clientX < trimming.boundaryX;
+        
+        if (draggedBackPastBoundary) {
+          // We've re-entered the valid region - resume trimming
+          setTrimming(prev => prev ? {
+            ...prev,
+            lastX: e.clientX,
+            maxDragDistance: totalDragDistance,
+            beyondBoundary: false,
+          } : null);
+        } else {
+          // Still beyond boundary, just update position tracking
+          setTrimming(prev => prev ? {
+            ...prev,
+            lastX: e.clientX,
+            maxDragDistance: isDraggingFurtherOut ? totalDragDistance : prev.maxDragDistance,
+          } : null);
+        }
+        return; // Don't apply trim while beyond boundary
+      }
+
+      // Get current clip state to check boundaries before applying trim
+      const currentClip = useProjectStore.getState().clips[clip.id];
+      const currentAsset = asset;
+      
+      if (!currentClip || !currentAsset) return;
 
       // Convert pixels to milliseconds: zoom is in px/ms, so ms = px / (px/ms)
       const deltaMs = deltaX / zoom;
 
-      // Apply the trim
+      // Check if this delta would hit a boundary
+      let wouldHitBoundary = false;
+      if (trimming.side === 'left') {
+        const newTrimStart = currentClip.trimStartMs + deltaMs;
+        const newStartMs = currentClip.startMs + deltaMs;
+        wouldHitBoundary = newTrimStart <= 0 || newStartMs <= 0;
+      } else {
+        const newTrimEnd = currentClip.trimEndMs + deltaMs;
+        // For images, allow extending up to 60 seconds (handled by trimClip)
+        // For videos, check against asset duration
+        if (currentAsset.type === 'image') {
+          const maxImageDuration = 60000;
+          wouldHitBoundary = newTrimEnd >= maxImageDuration;
+        } else {
+          wouldHitBoundary = newTrimEnd >= currentAsset.duration;
+        }
+      }
+
+      // Apply the trim (trimClip handles minimum durations internally)
       trimClip(clip.id, trimming.side, deltaMs);
 
-      // Update last position for next delta calculation
-      setTrimming(prev => prev ? { ...prev, lastX: e.clientX } : null);
+      // Update state with boundary detection
+      setTrimming(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          lastX: e.clientX,
+          maxDragDistance: totalDragDistance,
+          beyondBoundary: wouldHitBoundary,
+          boundaryX: wouldHitBoundary ? e.clientX : prev.boundaryX,
+        };
+      });
     };
 
     const handleUp = () => {
@@ -87,7 +168,7 @@ export function ClipView({ clip }: ClipViewProps) {
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [trimming, clip.id, zoom, trimClip]);
+  }, [trimming, clip, zoom, trimClip, getAssetById]);
 
   return (
     <div

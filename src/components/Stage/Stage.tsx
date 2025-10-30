@@ -1,23 +1,28 @@
 import { Play } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { usePlaybackStore } from "@/store/playbackStore";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { audioManager } from "@/lib/AudioManager";
 import { videoPoolManager } from "@/lib/VideoPoolManager";
 import { CanvasCompositor } from "@/lib/CanvasCompositor";
+import { TransformControls } from "./TransformControls";
 import type { Clip, Asset, Track } from "@/types";
 
 export function Stage() {
-  const { clips, getAssetById, tracks, assets, getTimelineDuration } = useProjectStore();
+  const { clips, getAssetById, tracks, assets, getTimelineDuration, getCanvasNodeByClipId, selectedClipIds, updateCanvasNode } = useProjectStore();
   const { currentTimeMs, playing, seek, pause } = usePlaybackStore();
   const timelineDuration = getTimelineDuration();
 
   // Canvas and compositor refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const compositorRef = useRef<CanvasCompositor | null>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Track canvas display dimensions
+  const [canvasDisplaySize, setCanvasDisplaySize] = useState({ width: 1920, height: 1080 });
 
   // Get ALL visible clips at current time (video, audio, image)
-  const visibleClips = getAllVisibleClips(clips, tracks, getAssetById, currentTimeMs);
+  const visibleClips = getAllVisibleClips(clips, tracks, getAssetById, currentTimeMs, getCanvasNodeByClipId);
   
   // Separate clips by type for rendering
   const videoAndImageClips = visibleClips.filter(
@@ -47,6 +52,7 @@ export function Stage() {
   }, [canvasRef.current]);
 
   // Load video assets into the pool when they're added to the project
+  // Note: Images are handled separately by CanvasCompositor's image cache
   useEffect(() => {
     const videoAssets = assets.filter(asset => asset.type === 'video');
     
@@ -129,7 +135,7 @@ export function Stage() {
       // Debug logging every 500ms
       if (currentFrameTime - lastLogTime > 500) {
         const timeFormatted = (newTimeMs / 1000).toFixed(2);
-        const activeClips = getAllVisibleClips(clips, tracks, getAssetById, newTimeMs);
+        const activeClips = getAllVisibleClips(clips, tracks, getAssetById, newTimeMs, getCanvasNodeByClipId);
         console.log(`⏱️  Playing: ${timeFormatted}s | Active clips: ${activeClips.length}`);
         lastLogTime = currentFrameTime;
       }
@@ -147,7 +153,7 @@ export function Stage() {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [playing, getTimelineDuration, clips, tracks, getAssetById]);
+  }, [playing, getTimelineDuration, clips, tracks, getAssetById, getCanvasNodeByClipId]);
 
   // Synchronize all audio sources with timeline position
   useEffect(() => {
@@ -162,14 +168,31 @@ export function Stage() {
     audioManager.syncToTime(currentTimeMs, audioClipsWithAssets);
   }, [currentTimeMs, audioClips, playing, getAssetById, tracks]);
 
-  // Handle play/pause state for audio manager
+  // Track canvas display dimensions for transform controls
   useEffect(() => {
-    if (playing) {
-      audioManager.play();
-    } else {
-      audioManager.pause();
-    }
-  }, [playing]);
+    if (!canvasContainerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setCanvasDisplaySize({ width, height });
+      }
+    });
+
+    resizeObserver.observe(canvasContainerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Get selected clip info for transform controls
+  const selectedClipId = selectedClipIds.length === 1 ? selectedClipIds[0] : null;
+  const selectedClip = selectedClipId ? clips[selectedClipId] : null;
+  const selectedCanvasNode = selectedClipId ? getCanvasNodeByClipId(selectedClipId) : null;
+  const selectedTrackIndex = selectedClip
+    ? tracks.findIndex(t => t.id === selectedClip.trackId)
+    : -1;
 
   return (
     <div className="h-full bg-dark-navy p-md">
@@ -188,13 +211,36 @@ export function Stage() {
           <div className="absolute inset-0 flex items-center justify-center p-md">
             <div className="relative w-full h-full max-h-full flex items-center justify-center">
               {/* Canvas for video/image compositing */}
-              <div className="relative aspect-video bg-black w-full h-full max-w-full max-h-full">
+              <div ref={canvasContainerRef} className="relative aspect-video bg-black w-full h-full max-w-full max-h-full">
                 <canvas
                   ref={canvasRef}
                   width={1920}
                   height={1080}
                   className="w-full h-full object-contain"
                 />
+
+                {/* Transform Controls Overlay */}
+                {/* Only render for Track 2+ clips (not main track) */}
+                {selectedClipId && selectedCanvasNode && selectedClip && selectedTrackIndex > 0 && (
+                  <TransformControls
+                    selectedClipId={selectedClipId}
+                    canvasNode={selectedCanvasNode}
+                    onUpdate={(updates) => {
+                      // Find canvasNode by clipId and update
+                      const nodeId = Object.keys(useProjectStore.getState().canvasNodes).find(
+                        nodeId => useProjectStore.getState().canvasNodes[nodeId].clipId === selectedClipId
+                      );
+                      if (nodeId) {
+                        updateCanvasNode(nodeId, updates);
+                      }
+                    }}
+                    canvasDisplayWidth={canvasDisplaySize.width}
+                    canvasDisplayHeight={canvasDisplaySize.height}
+                    canvasLogicalWidth={1920}
+                    canvasLogicalHeight={1080}
+                    trackIndex={selectedTrackIndex}
+                  />
+                )}
 
                 {/* Empty state */}
                 {videoAndImageClips.length === 0 && (
@@ -221,6 +267,7 @@ interface ClipWithMetadata {
   asset: Asset;
   track: Track;
   trackIndex: number;
+  canvasNode?: import('@/types').CanvasNode;
 }
 
 // Helper function to get ALL visible clips at current time (video, audio, image)
@@ -229,13 +276,17 @@ function getAllVisibleClips(
   clips: Record<string, Clip>, 
   tracks: Track[], 
   getAssetById: (id: string) => Asset | undefined,
-  currentTimeMs: number
+  currentTimeMs: number,
+  getCanvasNodeByClipId: (clipId: string) => import('@/types').CanvasNode | undefined
 ): ClipWithMetadata[] {
   const visibleClips: ClipWithMetadata[] = [];
   
   // Iterate through all visible tracks
   tracks.forEach((track, trackIndex) => {
     if (!track.visible) return;
+    
+    // Only check video tracks for canvas rendering (not audio tracks)
+    if (track.type !== 'video') return;
     
     // Find all clips on this track that are active at current time
     track.clips.forEach(clipId => {
@@ -246,11 +297,14 @@ function getAllVisibleClips(
       if (currentTimeMs >= clip.startMs && currentTimeMs < clip.endMs) {
         const asset = getAssetById(clip.assetId);
         if (asset) {
+          // Get canvasNode for this clip
+          const canvasNode = getCanvasNodeByClipId(clipId);
           visibleClips.push({
             clip,
             asset,
             track,
             trackIndex,
+            canvasNode,
           });
         }
       }

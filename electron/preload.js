@@ -27,6 +27,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reveal file in Finder/Explorer
   revealInFinder: (filePath) => ipcRenderer.invoke('reveal-in-finder', filePath),
   
+  // Delete file
+  deleteFile: (filePath) => ipcRenderer.invoke('delete-file', filePath),
+  
+  // AI Image Generation
+  generateImage: (prompt) => ipcRenderer.invoke('generate-image', prompt),
+  
   // Screen recording
   listCaptureDevices: () => ipcRenderer.invoke('list-capture-devices'),
   startScreenRecord: (settings) => ipcRenderer.invoke('start-screen-record', settings),

@@ -12,6 +12,7 @@ export function TimelineDock() {
   const { tracks, getTimelineDuration } = useProjectStore();
   const { zoom, setZoom } = usePlaybackStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle scroll wheel for zooming
   useEffect(() => {
@@ -47,6 +48,36 @@ export function TimelineDock() {
     };
   }, [zoom, setZoom]);
 
+  // Handle auto-hiding scrollbars on scroll activity
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      // Add scrolling class to show scrollbars
+      container.classList.add("scrolling");
+
+      // Clear previous timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
+      // Remove scrolling class after 0.5 seconds of inactivity
+      scrollTimeoutRef.current = setTimeout(() => {
+        container.classList.remove("scrolling");
+      }, 500);
+    };
+
+    container.addEventListener("scroll", handleScroll);
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Calculate minimum width based on timeline duration
   const timelineDuration = getTimelineDuration();
   const minWidth = Math.max(msToPixels(timelineDuration, zoom), 2000); // At least 2000px
@@ -67,7 +98,7 @@ export function TimelineDock() {
       {/* Scrollable tracks area - headers and tracks together */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-auto scrollbar-starscape bg-linear-to-b from-dark-navy/50 to-mid-navy/30 relative"
+        className="flex-1 overflow-auto scrollbar-auto-hide bg-linear-to-b from-dark-navy/50 to-mid-navy/30 relative"
         id="tracks-scroll"
       >
         {/* Wide container for timeline */}
