@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Monitor, Video, Circle } from "lucide-react";
+import { CheckCircle, Video, Circle } from "lucide-react";
 import { startScreenRecord, stopScreenRecord, listenStartRecording, listenStopRecording, saveBlobToFile, revealInFinder, deleteFile } from "@/lib/bindings";
 import { useProjectStore } from "@/store/projectStore";
 import { useUiStore } from "@/store/uiStore";
@@ -30,6 +30,7 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
   const [recordingId, setRecordingId] = useState<string>("");
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null); // Preview-only webcam stream
   const [compositeStream, setCompositeStream] = useState<MediaStream | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordingSuccess, setRecordingSuccess] = useState<{ path: string } | null>(null);
@@ -43,14 +44,16 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
   // Refs
   const screenVideoRef = useRef<HTMLVideoElement>(null);
   const webcamVideoRef = useRef<HTMLVideoElement>(null);
+  const webcamPreviewRef = useRef<HTMLVideoElement>(null); // Visible preview element
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const isRecordingRef = useRef<boolean>(false);
+  const listenersReadyRef = useRef<boolean>(false);
   
   // Stream refs for cleanup
   const screenStreamRef = useRef<MediaStream | null>(null);
   const webcamStreamRef = useRef<MediaStream | null>(null);
+  const previewStreamRef = useRef<MediaStream | null>(null);
   const compositeStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   
@@ -65,6 +68,7 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
       setRecordingSuccess(null);
     } else {
       cleanup();
+      cleanupPreview();
     }
   }, [open]);
 
@@ -100,13 +104,68 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
     }
   };
 
+  // Start preview when device is selected
+  useEffect(() => {
+    if (selectedVideoDevice && recordingState === 'setup') {
+      startPreview();
+    }
+  }, [selectedVideoDevice, recordingState]);
+
+  // Start live preview
+  const startPreview = async () => {
+    try {
+      // Stop existing preview stream
+      cleanupPreview();
+      
+      // Request new stream with selected device
+      const constraints: MediaStreamConstraints = {
+        video: {
+          deviceId: selectedVideoDevice ? { exact: selectedVideoDevice } : undefined,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setPreviewStream(stream);
+      previewStreamRef.current = stream;
+      
+      // Set video preview
+      if (webcamPreviewRef.current) {
+        webcamPreviewRef.current.srcObject = stream;
+        // Explicitly play the video
+        webcamPreviewRef.current.play().catch(err => {
+          console.error('Failed to play preview:', err);
+        });
+      }
+      
+    } catch (err) {
+      console.error('Failed to start preview:', err);
+      setError('Failed to start camera preview.');
+    }
+  };
+
+  // Cleanup preview stream
+  const cleanupPreview = () => {
+    if (previewStreamRef.current) {
+      previewStreamRef.current.getTracks().forEach(track => track.stop());
+      previewStreamRef.current = null;
+      setPreviewStream(null);
+    }
+    // Don't clear preview video element here - let the caller handle it
+  };
+
   // Set up recording event listeners
   useEffect(() => {
     let startUnlisten: (() => void) | undefined;
     let stopUnlisten: (() => void) | undefined;
 
     const setupListeners = async () => {
-      startUnlisten = await listenStartRecording(async (event) => {
+      listenersReadyRef.current = false;
+      
+      try {
+        startUnlisten = await listenStartRecording(async (event) => {
         try {
           // Get the screen source
           const screenMediaStream = await navigator.mediaDevices.getUserMedia({
@@ -152,10 +211,19 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
           setWebcamStream(webcamMediaStream);
           webcamStreamRef.current = webcamMediaStream;
 
-          // Set up webcam video element
+          // Set up webcam video element (hidden, for compositing)
           if (webcamVideoRef.current) {
             webcamVideoRef.current.srcObject = webcamMediaStream;
             await webcamVideoRef.current.play();
+          }
+
+          // Stop preview-only stream first (before switching to recording stream)
+          cleanupPreview();
+          
+          // Update preview to use the recording stream
+          if (webcamPreviewRef.current) {
+            webcamPreviewRef.current.srcObject = webcamMediaStream;
+            await webcamPreviewRef.current.play();
           }
 
           // Wait for videos to be ready
@@ -176,12 +244,11 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
             }),
           ]);
 
-          // Create composite canvas
+          // Create composite canvas (hidden, only for recording)
           const canvas = canvasRef.current;
-          const previewCanvas = previewCanvasRef.current;
           
-          if (!canvas || !previewCanvas) {
-            throw new Error('Canvas elements not found');
+          if (!canvas) {
+            throw new Error('Canvas element not found');
           }
 
           // Get screen dimensions
@@ -191,8 +258,6 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
           // Set canvas dimensions to match screen
           canvas.width = screenWidth;
           canvas.height = screenHeight;
-          previewCanvas.width = screenWidth;
-          previewCanvas.height = screenHeight;
 
           // Calculate webcam PIP size and position (bottom-right corner)
           const pipWidth = Math.min(320, screenWidth * 0.2); // 20% of screen width, max 320px
@@ -201,27 +266,23 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
           const pipX = screenWidth - pipWidth - pipPadding;
           const pipY = screenHeight - pipHeight - pipPadding;
 
-          // Composite function - draws both videos to canvas
+          // Composite function - draws both videos to canvas (hidden, for recording only)
           const compositeVideos = () => {
-            if (!canvas || !previewCanvas || !screenVideoRef.current || !webcamVideoRef.current) {
+            if (!canvas || !screenVideoRef.current || !webcamVideoRef.current) {
               return;
             }
 
             const ctx = canvas.getContext('2d');
-            const previewCtx = previewCanvas.getContext('2d');
-            
-            if (!ctx || !previewCtx) return;
+            if (!ctx) return;
 
             // Draw screen video as background
             if (screenVideoRef.current.videoWidth > 0 && screenVideoRef.current.videoHeight > 0) {
               ctx.drawImage(screenVideoRef.current, 0, 0, canvas.width, canvas.height);
-              previewCtx.drawImage(screenVideoRef.current, 0, 0, previewCanvas.width, previewCanvas.height);
             }
 
             // Draw webcam video as PIP overlay (bottom-right)
             if (webcamVideoRef.current.videoWidth > 0 && webcamVideoRef.current.videoHeight > 0) {
               // Draw webcam with rounded corners and border
-              // Use arcTo for rounded corners (more compatible)
               const radius = 8;
               ctx.save();
               ctx.beginPath();
@@ -255,39 +316,6 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
               ctx.quadraticCurveTo(pipX, pipY, pipX + radius, pipY);
               ctx.closePath();
               ctx.stroke();
-
-              // Preview canvas - same rounded rectangle
-              previewCtx.save();
-              previewCtx.beginPath();
-              previewCtx.moveTo(pipX + radius, pipY);
-              previewCtx.lineTo(pipX + pipWidth - radius, pipY);
-              previewCtx.quadraticCurveTo(pipX + pipWidth, pipY, pipX + pipWidth, pipY + radius);
-              previewCtx.lineTo(pipX + pipWidth, pipY + pipHeight - radius);
-              previewCtx.quadraticCurveTo(pipX + pipWidth, pipY + pipHeight, pipX + pipWidth - radius, pipY + pipHeight);
-              previewCtx.lineTo(pipX + radius, pipY + pipHeight);
-              previewCtx.quadraticCurveTo(pipX, pipY + pipHeight, pipX, pipY + pipHeight - radius);
-              previewCtx.lineTo(pipX, pipY + radius);
-              previewCtx.quadraticCurveTo(pipX, pipY, pipX + radius, pipY);
-              previewCtx.closePath();
-              previewCtx.clip();
-              previewCtx.drawImage(webcamVideoRef.current, pipX, pipY, pipWidth, pipHeight);
-              previewCtx.restore();
-              
-              // Add border to preview
-              previewCtx.strokeStyle = '#ffffff';
-              previewCtx.lineWidth = 2;
-              previewCtx.beginPath();
-              previewCtx.moveTo(pipX + radius, pipY);
-              previewCtx.lineTo(pipX + pipWidth - radius, pipY);
-              previewCtx.quadraticCurveTo(pipX + pipWidth, pipY, pipX + pipWidth, pipY + radius);
-              previewCtx.lineTo(pipX + pipWidth, pipY + pipHeight - radius);
-              previewCtx.quadraticCurveTo(pipX + pipWidth, pipY + pipHeight, pipX + pipWidth - radius, pipY + pipHeight);
-              previewCtx.lineTo(pipX + radius, pipY + pipHeight);
-              previewCtx.quadraticCurveTo(pipX, pipY + pipHeight, pipX, pipY + pipHeight - radius);
-              previewCtx.lineTo(pipX, pipY + radius);
-              previewCtx.quadraticCurveTo(pipX, pipY, pipX + radius, pipY);
-              previewCtx.closePath();
-              previewCtx.stroke();
             }
 
             // Continue animation
@@ -295,9 +323,6 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
               animationFrameRef.current = requestAnimationFrame(compositeVideos);
             }
           };
-
-          // Start compositing
-          compositeVideos();
 
           // Create canvas stream for recording
           const canvasStream = canvas.captureStream(30); // 30 FPS
@@ -325,6 +350,9 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
               animationFrameRef.current = null;
             }
 
+            // Stop duration timer immediately
+            stopDurationTimer();
+
             const blob = new Blob(chunks, { type: 'video/webm' });
             
             try {
@@ -338,19 +366,57 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
               const result = await saveBlobToFile(arrayBuffer, filename);
               setRecordingSuccess({ path: result.path });
               setRecordingState('success');
-              stopDurationTimer();
             } catch (error) {
               setError(`Failed to save recording: ${error}`);
               setRecordingState('setup');
             }
             
-            // Clean up
-            cleanup();
+            // Clean up recording streams
+            // Stop screen stream
+            if (screenStreamRef.current) {
+              screenStreamRef.current.getTracks().forEach(track => track.stop());
+              screenStreamRef.current = null;
+              setScreenStream(null);
+            }
+            
+            // Stop composite stream
+            if (compositeStreamRef.current) {
+              compositeStreamRef.current.getTracks().forEach(track => track.stop());
+              compositeStreamRef.current = null;
+              setCompositeStream(null);
+            }
+            
+            // Stop recording webcam stream
+            if (webcamStreamRef.current) {
+              webcamStreamRef.current.getTracks().forEach(track => track.stop());
+              webcamStreamRef.current = null;
+              setWebcamStream(null);
+            }
+            
+            // Clear all video elements
+            if (screenVideoRef.current) {
+              screenVideoRef.current.srcObject = null;
+            }
+            if (webcamVideoRef.current) {
+              webcamVideoRef.current.srcObject = null;
+            }
+            if (webcamPreviewRef.current) {
+              webcamPreviewRef.current.srcObject = null;
+            }
+            
+            // Don't restart preview automatically - ensure webcam is fully released
+            // User can restart preview manually if needed
           };
 
           mediaRecorderRef.current = recorder;
           setMediaRecorder(recorder);
+          
+          // Set recording flag BEFORE starting compositing loop
           isRecordingRef.current = true;
+          
+          // Start the compositing loop - this will continuously draw frames
+          compositeVideos();
+          
           recorder.start(1000); // Record in 1-second chunks
           setRecordingState('recording');
           startDurationTimer();
@@ -362,36 +428,64 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
         }
       });
 
-      stopUnlisten = await listenStopRecording((event) => {
+      stopUnlisten = await listenStopRecording(() => {
         try {
           if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();
           }
+          // Also stop the timer and update state immediately
+          stopDurationTimer();
         } catch (error) {
           setError(String(error));
         }
       });
-    };
+      
+      // Mark listeners as ready after they're both set up
+      listenersReadyRef.current = true;
+    } catch (error) {
+      console.error('Failed to set up recording listeners:', error);
+      listenersReadyRef.current = false;
+      // Don't throw - just log the error
+    }
+  };
 
-    if (open && recordingState === 'setup') {
-      setupListeners();
+    // Set up listeners when dialog opens - always set them up immediately
+    if (open) {
+      // Set up listeners immediately when dialog opens
+      setupListeners().catch((err) => {
+        console.error('Failed to set up recording listeners:', err);
+        setError('Failed to set up recording listeners');
+      });
     }
 
     return () => {
+      listenersReadyRef.current = false;
       if (startUnlisten) startUnlisten();
       if (stopUnlisten) stopUnlisten();
     };
-  }, [open, recordingState, selectedVideoDevice]);
+    // Only depend on open and selectedVideoDevice - NOT recordingState!
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, selectedVideoDevice]);
 
   // Cleanup on dialog close
   useEffect(() => {
     if (!open) {
+      // Stop ALL streams including preview - do this FIRST to ensure webcam is released
+      cleanupPreview();
       cleanup();
+      
+      // Clear all state
       setRecordingState('setup');
       setError(null);
       setRecordingSuccess(null);
       setRecordingDuration(0);
       setRecordingId("");
+      setPreviewStream(null);
+      setWebcamStream(null);
+      setScreenStream(null);
+      
+      // Reset listener ready flag
+      listenersReadyRef.current = false;
     }
   }, [open]);
 
@@ -426,6 +520,18 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
       
       if (!selectedVideoDevice) {
         setError('Please select a webcam device');
+        return;
+      }
+
+      // Wait for listeners to be ready (with timeout)
+      let waitCount = 0;
+      while (!listenersReadyRef.current && waitCount < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        waitCount++;
+      }
+      
+      if (!listenersReadyRef.current) {
+        setError('Recording listeners not ready. Please try again.');
         return;
       }
 
@@ -480,12 +586,18 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
       setCompositeStream(null);
     }
 
-    // Clear video elements
+    // Stop ALL webcam streams (both preview and recording)
+    cleanupPreview();
+
+    // Clear ALL video elements
     if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = null;
     }
     if (webcamVideoRef.current) {
       webcamVideoRef.current.srcObject = null;
+    }
+    if (webcamPreviewRef.current) {
+      webcamPreviewRef.current.srcObject = null;
     }
 
     // Stop media recorder
@@ -521,11 +633,14 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
           {/* Setup / Recording View */}
           {(recordingState === 'setup' || recordingState === 'recording') && (
             <>
-              {/* Preview Canvas */}
+              {/* Webcam Preview */}
               <div className="relative bg-black rounded-lg overflow-hidden w-full" style={{ aspectRatio: '16/9' }}>
-                <canvas
-                  ref={previewCanvasRef}
-                  className="w-full h-full object-contain"
+                <video
+                  ref={webcamPreviewRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover"
                 />
                 
                 {/* Hidden video elements for compositing */}
@@ -556,12 +671,12 @@ export function ScreenWebcamRecordingDialog({ open, onOpenChange }: ScreenWebcam
                   </div>
                 )}
                 
-                {/* Setup State */}
-                {recordingState === 'setup' && !screenStream && (
+                {/* Setup State - No preview */}
+                {recordingState === 'setup' && !previewStream && !webcamStream && (
                   <div className="absolute inset-0 flex items-center justify-center text-white/50">
                     <div className="text-center">
-                      <Monitor className="h-16 w-16 mx-auto mb-2 opacity-50" />
-                      <p>Select a camera and click Start Recording</p>
+                      <Video className="h-16 w-16 mx-auto mb-2 opacity-50" />
+                      <p>Select a camera to preview</p>
                     </div>
                   </div>
                 )}

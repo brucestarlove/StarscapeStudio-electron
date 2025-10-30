@@ -34,14 +34,14 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 
 ## remaining for final
 - [x] better trim
-- [ ] multiple tracks (main + overlay/PiP)
+- [x] multiple tracks (main + overlay/PiP)
 - [ ] webm?
 - [x] fix export resolution
 - [x] Webcam recording (access system camera)
 - [ ] Simultaneous screen + webcam (picture-in-picture style)
 - [x] Audio capture from microphone
 - [x] Record, stop, and save recordings directly to timeline
-- [ ] progress indicator during export
+- [x] progress indicator during export
 
 ## stretch goals
 - [ ] Text overlays with custom fonts and animations
@@ -49,7 +49,7 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 - [ ] Audio controls (volume adjustment, fade in/out)
 - [ ] Filters and effects (brightness, contrast, saturation)
 - [ ] Export presets for different platforms (YouTube, Instagram, TikTok)
-- [ ] Keyboard shortcuts for common actions
+- [x] Keyboard shortcuts for common actions
 - [ ] Auto-save project state
 - [ ] Undo/redo functionality
 
@@ -87,7 +87,7 @@ We'll test your app with:
 - [x] cosmic asset generation specifically
 - [ ] integrate with other Starscape
 
-
+--- 
 
 # currently relying on ffmpeg installed on users' machines via homebrew
 Here’s how bundling FFmpeg/FFprobe binaries would work:
