@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Video, Mic, Circle } from "lucide-react";
-import { saveBlobToFile, revealInFinder } from "@/lib/bindings";
+import { saveBlobToFile, revealInFinder, deleteFile } from "@/lib/bindings";
 import { useProjectStore } from "@/store/projectStore";
 import { useUiStore } from "@/store/uiStore";
 
@@ -415,7 +415,15 @@ export function WebcamRecordingDialog({ open, onOpenChange }: WebcamRecordingDia
                   onClick={async () => {
                     const { addAssetsFromPaths } = useProjectStore.getState();
                     try {
+                      // Import the recording to library
                       await addAssetsFromPaths([recordingSuccess.path]);
+                      // Delete the temporary file after successful import
+                      try {
+                        await deleteFile(recordingSuccess.path);
+                      } catch (deleteError) {
+                        console.warn('Failed to delete temporary file:', deleteError);
+                        // Don't block the import if deletion fails
+                      }
                       handleClose();
                       setActiveLeftPaneTab('library');
                     } catch (error) {

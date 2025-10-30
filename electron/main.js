@@ -715,6 +715,26 @@ ipcMain.handle('reveal-in-finder', async (event, filePath) => {
 });
 
 /**
+ * Delete a file
+ */
+ipcMain.handle('delete-file', async (event, filePath) => {
+  try {
+    const fs = require('fs');
+    await fs.promises.unlink(filePath);
+    console.log(`Deleted file: ${filePath}`);
+    return { success: true };
+  } catch (error) {
+    // If file doesn't exist, consider it a success
+    if (error.code === 'ENOENT') {
+      console.log(`File already deleted: ${filePath}`);
+      return { success: true };
+    }
+    console.error('Error deleting file:', error);
+    throw new Error(`Failed to delete file: ${error.message}`);
+  }
+});
+
+/**
  * Download image from URL and save to file
  */
 async function downloadImage(url, outputPath) {

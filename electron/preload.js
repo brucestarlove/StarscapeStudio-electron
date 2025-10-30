@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reveal file in Finder/Explorer
   revealInFinder: (filePath) => ipcRenderer.invoke('reveal-in-finder', filePath),
   
+  // Delete file
+  deleteFile: (filePath) => ipcRenderer.invoke('delete-file', filePath),
+  
   // AI Image Generation
   generateImage: (prompt) => ipcRenderer.invoke('generate-image', prompt),
   

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { generateCosmicImage, revealInFinder } from "@/lib/bindings";
+import { generateCosmicImage, revealInFinder, deleteFile } from "@/lib/bindings";
 import { useProjectStore } from "@/store/projectStore";
 import { useUiStore } from "@/store/uiStore";
 import { cn } from "@/lib/utils";
@@ -64,6 +64,13 @@ export function GenerateCosmicImageDialog({ open, onOpenChange }: GenerateCosmic
 
     try {
       await addAssetsFromPaths([generatedImagePath]);
+      // Delete the temporary file after successful import
+      try {
+        await deleteFile(generatedImagePath);
+      } catch (deleteError) {
+        console.warn('Failed to delete temporary file:', deleteError);
+        // Don't block the import if deletion fails
+      }
       handleOpenChange(false);
       setActiveLeftPaneTab('library');
     } catch (err) {

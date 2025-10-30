@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import { WebcamRecordingDialog } from "./WebcamRecordingDialog";
 import { MicrophoneRecordingDialog } from "./MicrophoneRecordingDialog";
 import { ScreenRecordingDialog } from "./ScreenRecordingDialog";
+import { ScreenWebcamRecordingDialog } from "./ScreenWebcamRecordingDialog";
 
 export function UtilitiesPane() {
   const { setLeftPaneCollapsed } = useUiStore();
@@ -17,6 +18,9 @@ export function UtilitiesPane() {
   
   // Microphone recording dialog state
   const [microphoneDialogOpen, setMicrophoneDialogOpen] = useState(false);
+  
+  // Screen + Webcam recording dialog state
+  const [screenWebcamDialogOpen, setScreenWebcamDialogOpen] = useState(false);
 
   return (
     <>
@@ -58,14 +62,14 @@ export function UtilitiesPane() {
               </Button>
             </div>
 
-            {/* Other Utilities (Disabled for now) */}
+            {/* Screen + Webcam Recording */}
             <div className="space-y-sm">
-              <h3 className="text-sm font-semibold text-white/80">Coming Soon™️</h3>
+              <h3 className="text-sm font-semibold text-white/80">Picture-in-Picture</h3>
               <Button
-                disabled
-                className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
+                onClick={() => setScreenWebcamDialogOpen(true)}
+                className="w-full py-2 bg-gradient-cyan-purple text-white hover:opacity-90 rounded transition-all"
               >
-                Screen + Webcam Recording
+                📹⏥ Screen + Webcam Recording
               </Button>
             </div>
         </div>
@@ -87,6 +91,12 @@ export function UtilitiesPane() {
       <MicrophoneRecordingDialog 
         open={microphoneDialogOpen}
         onOpenChange={setMicrophoneDialogOpen}
+      />
+
+      {/* Screen + Webcam Recording Dialog */}
+      <ScreenWebcamRecordingDialog 
+        open={screenWebcamDialogOpen}
+        onOpenChange={setScreenWebcamDialogOpen}
       />
     </>
   );

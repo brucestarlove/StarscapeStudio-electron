@@ -145,6 +145,11 @@ export async function revealInFinder(filePath: string): Promise<{ success: boole
   return window.electronAPI.revealInFinder(filePath);
 }
 
+// Delete file
+export async function deleteFile(filePath: string): Promise<{ success: boolean }> {
+  return window.electronAPI.deleteFile(filePath);
+}
+
 // Generate cosmic image using AI
 export async function generateCosmicImage(prompt: string): Promise<GenerateImageResult> {
   return window.electronAPI.generateImage(prompt);
@@ -168,6 +173,7 @@ declare global {
       onStartRecording: (callback: (event: { recordingId: string; sourceId: string; outputPath: string; settings: RecordSettings }) => void) => () => void;
       onStopRecording: (callback: (event: { recordingId: string }) => void) => () => void;
       revealInFinder: (filePath: string) => Promise<{ success: boolean }>;
+      deleteFile: (filePath: string) => Promise<{ success: boolean }>;
       generateImage: (prompt: string) => Promise<GenerateImageResult>;
     };
   }
