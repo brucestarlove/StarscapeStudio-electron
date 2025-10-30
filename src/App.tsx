@@ -260,6 +260,38 @@ function App() {
       positionMs
     };
 
+    // Prevent audio assets/clips from being dropped on video tracks
+    if (dropResult.trackId) {
+      const { tracks } = useProjectStore.getState();
+      const targetTrack = tracks.find(t => t.id === dropResult.trackId);
+      
+      if (targetTrack && targetTrack.type === 'video') {
+        // Check if dragging audio asset
+        if (dragItem.type === 'asset') {
+          const asset = getAssetById(dragItem.id);
+          if (asset?.type === 'audio') {
+            console.log('Drop cancelled - audio assets cannot be placed on video tracks');
+            setClipDragData(null);
+            setActiveDragItem(null);
+            return;
+          }
+        }
+        // Check if dragging audio clip
+        else if (dragItem.type === 'clip') {
+          const clip = useProjectStore.getState().clips[dragItem.id];
+          if (clip) {
+            const asset = getAssetById(clip.assetId);
+            if (asset?.type === 'audio') {
+              console.log('Drop cancelled - audio clips cannot be placed on video tracks');
+              setClipDragData(null);
+              setActiveDragItem(null);
+              return;
+            }
+          }
+        }
+      }
+    }
+
     if (dragItem.type === 'asset' && dropResult.trackId) {
       // Create new clip from asset - check for collisions
       const { assets } = useProjectStore.getState();

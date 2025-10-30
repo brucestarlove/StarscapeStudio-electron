@@ -110,7 +110,7 @@ function AssetCard({ asset, onDoubleClick, onAddToTimeline, onRename, onDelete }
 
             {/* Resolution and file size */}
             <div className="text-[10px] text-white/40 flex items-center gap-2">
-              {asset.metadata.width && asset.metadata.height && (
+              {asset.type !== 'audio' && asset.metadata.width && asset.metadata.height && (
                 <>
                   <span>{asset.metadata.width}×{asset.metadata.height}</span>
                   {asset.fileSize && <span>•</span>}
@@ -169,13 +169,19 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
   const handleAssetDoubleClick = (asset: Asset) => {
     const state = useProjectStore.getState();
 
-    // Use selected track if available, otherwise fall back to first video track
+    // Determine target track based on asset type
     let targetTrack = null;
-    if (state.selectedTrackId) {
-      targetTrack = state.tracks.find(t => t.id === state.selectedTrackId);
-    }
-    if (!targetTrack) {
-      targetTrack = state.tracks.find(t => t.type === 'video');
+    if (asset.type === 'audio') {
+      // For audio assets, always use Audio Track 1 (first audio track)
+      targetTrack = state.tracks.find(t => t.type === 'audio');
+    } else {
+      // For video/image assets, use selected track if available, otherwise fall back to first video track
+      if (state.selectedTrackId) {
+        targetTrack = state.tracks.find(t => t.id === state.selectedTrackId);
+      }
+      if (!targetTrack) {
+        targetTrack = state.tracks.find(t => t.type === 'video');
+      }
     }
 
     if (targetTrack) {
@@ -187,11 +193,22 @@ export function LibraryGrid({ onUploadClick }: LibraryGridProps) {
         .filter(clip => clip !== undefined)
         .sort((a, b) => b.endMs - a.endMs); // Sort by end time, descending
 
-      // Calculate where to place the clip (after all existing clips, or at currentTime if earlier)
-      let insertPosition = currentTimeMs;
-      if (trackClips.length > 0) {
-        const lastClipEnd = trackClips[0].endMs;
-        insertPosition = Math.max(currentTimeMs, lastClipEnd);
+      // Calculate where to place the clip
+      let insertPosition: number;
+      if (asset.type === 'audio') {
+        // For audio: start at 0 seconds unless there's an existing clip, then place at end of last clip
+        if (trackClips.length > 0) {
+          insertPosition = trackClips[0].endMs;
+        } else {
+          insertPosition = 0;
+        }
+      } else {
+        // For video/image: after all existing clips, or at currentTime if earlier
+        insertPosition = currentTimeMs;
+        if (trackClips.length > 0) {
+          const lastClipEnd = trackClips[0].endMs;
+          insertPosition = Math.max(currentTimeMs, lastClipEnd);
+        }
       }
 
       // Create clip and get the returned clipId
