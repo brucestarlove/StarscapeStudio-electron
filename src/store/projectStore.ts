@@ -46,6 +46,7 @@ interface ProjectStore extends ProjectState {
   getClipsByTrack: (trackId: string) => Clip[];
   getSelectedClips: () => Clip[];
   getAssetById: (assetId: string) => Asset | undefined;
+  getCanvasNodeByClipId: (clipId: string) => CanvasNode | undefined;
   getTimelineDuration: () => number;
 }
 
@@ -320,18 +321,74 @@ export const useProjectStore = create<ProjectStore>()(
           state.clips[clipId] = clip;
           track.clips.push(clipId);
 
-          // Create canvas node
+          // Create canvas node based on track position
+          // Find first video track to determine if this is Track 1 (Main Track)
+          const firstVideoTrack = state.tracks.find((t: Track) => t.type === 'video');
+          const isMainTrack = track.type === 'video' && track.id === firstVideoTrack?.id;
+          
           const nodeId = generateId();
-          state.canvasNodes[nodeId] = {
-            id: nodeId,
-            clipId,
-            x: 0,
-            y: 0,
-            width: 200,
-            height: 150,
-            rotation: 0,
-            opacity: 1,
-          };
+          
+          if (isMainTrack) {
+            // Track 1 (Main Track): Full canvas dimensions
+            state.canvasNodes[nodeId] = {
+              id: nodeId,
+              clipId,
+              x: 0,
+              y: 0,
+              width: 1920,
+              height: 1080,
+              rotation: 0,
+              opacity: 1,
+            };
+          } else if (track.type === 'video') {
+            // Track 2+ (PiP Tracks): Default PiP size and position
+            // Calculate dimensions preserving asset aspect ratio
+            const defaultMaxWidth = 480;
+            const defaultMaxHeight = 270;
+            const padding = 40;
+            
+            let pipWidth = defaultMaxWidth;
+            let pipHeight = defaultMaxHeight;
+            
+            // If asset has dimensions, preserve aspect ratio
+            if (asset.metadata.width && asset.metadata.height && asset.metadata.width > 0 && asset.metadata.height > 0) {
+              const assetAspect = asset.metadata.width / asset.metadata.height;
+              const defaultAspect = defaultMaxWidth / defaultMaxHeight;
+              
+              if (assetAspect > defaultAspect) {
+                // Asset is wider - fit to width
+                pipWidth = defaultMaxWidth;
+                pipHeight = defaultMaxWidth / assetAspect;
+              } else {
+                // Asset is taller - fit to height
+                pipHeight = defaultMaxHeight;
+                pipWidth = defaultMaxHeight * assetAspect;
+              }
+            }
+            
+            state.canvasNodes[nodeId] = {
+              id: nodeId,
+              clipId,
+              x: 1920 - pipWidth - padding, // Bottom-right with padding
+              y: 1080 - pipHeight - padding,
+              width: pipWidth,
+              height: pipHeight,
+              rotation: 0,
+              opacity: 1,
+            };
+          } else {
+            // Audio tracks or other types: Default small size
+            state.canvasNodes[nodeId] = {
+              id: nodeId,
+              clipId,
+              x: 0,
+              y: 0,
+              width: 200,
+              height: 150,
+              rotation: 0,
+              opacity: 1,
+            };
+          }
         });
         return clipId;
       },
@@ -358,7 +415,14 @@ export const useProjectStore = create<ProjectStore>()(
 
           // Remove clip and canvas node
           delete state.clips[clipId];
-          delete state.canvasNodes[clipId];
+          
+          // Find and delete canvas node by clipId
+          const canvasNode = Object.values(state.canvasNodes).find(
+            (node: CanvasNode) => node.clipId === clipId
+          );
+          if (canvasNode) {
+            delete state.canvasNodes[canvasNode.id];
+          }
 
           // Remove from selection
           state.selectedClipIds = state.selectedClipIds.filter((id: string) => id !== clipId);
@@ -530,18 +594,37 @@ export const useProjectStore = create<ProjectStore>()(
 
           state.clips[newClipId] = newClip;
 
-          // Create canvas node for new clip
+          // Create canvas node for new clip, inheriting from parent clip
+          const parentCanvasNode = Object.values(state.canvasNodes).find(
+            (node: CanvasNode) => node.clipId === clipId
+          );
+          
           const nodeId = generateId();
-          state.canvasNodes[nodeId] = {
-            id: nodeId,
-            clipId: newClipId,
-            x: 0,
-            y: 0,
-            width: 200,
-            height: 150,
-            rotation: 0,
-            opacity: 1,
-          };
+          if (parentCanvasNode) {
+            // Inherit parent's transform properties
+            state.canvasNodes[nodeId] = {
+              id: nodeId,
+              clipId: newClipId,
+              x: parentCanvasNode.x,
+              y: parentCanvasNode.y,
+              width: parentCanvasNode.width,
+              height: parentCanvasNode.height,
+              rotation: parentCanvasNode.rotation,
+              opacity: parentCanvasNode.opacity,
+            };
+          } else {
+            // Fallback to defaults if parent node not found
+            state.canvasNodes[nodeId] = {
+              id: nodeId,
+              clipId: newClipId,
+              x: 0,
+              y: 0,
+              width: 200,
+              height: 150,
+              rotation: 0,
+              opacity: 1,
+            };
+          }
         });
       },
 
@@ -658,6 +741,13 @@ export const useProjectStore = create<ProjectStore>()(
       getAssetById: (assetId: string) => {
         const state = get();
         return state.assets.find((asset: Asset) => asset.id === assetId);
+      },
+
+      getCanvasNodeByClipId: (clipId: string) => {
+        const state = get();
+        return Object.values(state.canvasNodes).find(
+          (node: CanvasNode) => node.clipId === clipId
+        );
       },
 
       getTimelineDuration: () => {

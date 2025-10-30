@@ -12,7 +12,7 @@ interface ExportDialogProps {
 }
 
 export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
-  const { id, projectName, assets, tracks, clips } = useProjectStore();
+  const { id, projectName, assets, tracks, clips, canvasNodes } = useProjectStore();
   
   // Export settings state
   const [settings, setSettings] = useState<ExportSettings>({
@@ -74,10 +74,18 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
       });
       
       const backendTracks: Record<string, any> = {};
-      tracks.forEach((track, index) => {
-        // All video tracks are treated as 'main' for export
-        // Audio tracks can be 'overlay' (they'll be mixed together)
-        const role = track.type === 'video' ? 'main' : 'overlay';
+      // Find first video track to determine main track
+      const firstVideoTrack = tracks.find(t => t.type === 'video');
+      
+      tracks.forEach((track) => {
+        // First video track is 'main', subsequent video tracks are 'overlay' (PiP)
+        // Audio tracks are 'overlay' (they'll be mixed together)
+        let role: string;
+        if (track.type === 'video') {
+          role = track.id === firstVideoTrack?.id ? 'main' : 'overlay';
+        } else {
+          role = 'overlay';
+        }
         
         backendTracks[track.id] = {
           id: track.id,
@@ -89,12 +97,28 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
       });
 
       // Create project JSON in backend format
+      // Include canvasNodes for PiP transforms
+      const backendCanvasNodes: Record<string, any> = {};
+      Object.values(canvasNodes).forEach(node => {
+        backendCanvasNodes[node.id] = {
+          id: node.id,
+          clipId: node.clipId,
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+          rotation: node.rotation,
+          opacity: node.opacity,
+        };
+      });
+
       const projectJson = JSON.stringify({
         id,
         projectName,
         assets: backendAssets,
         clips: backendClips,
         tracks: backendTracks,
+        canvasNodes: backendCanvasNodes,
       });
 
       // Set up progress listener

@@ -1,4 +1,4 @@
-import type { Asset, Clip, Track } from '@/types';
+import type { Asset, Clip, Track, CanvasNode } from '@/types';
 import { videoPoolManager } from './VideoPoolManager';
 
 /**
@@ -9,6 +9,7 @@ export interface ClipRenderData {
   asset: Asset;
   track: Track;
   trackIndex: number;
+  canvasNode?: CanvasNode;
 }
 
 /**
@@ -164,17 +165,59 @@ export class CanvasCompositor {
   private renderClip(clipData: ClipRenderData): void {
     if (!this.ctx || !this.canvas) return;
     
-    const { clip, asset } = clipData;
+    const { clip, asset, trackIndex, canvasNode } = clipData;
     
-    if (asset.type === 'video') {
-      this.renderVideo(clip, asset);
-    } else if (asset.type === 'image') {
-      this.renderImage(clip, asset);
+    // Track 1 (Main Track): Render full-screen without transforms
+    if (trackIndex === 0) {
+      if (asset.type === 'video') {
+        this.renderVideo(clip, asset);
+      } else if (asset.type === 'image') {
+        this.renderImage(clip, asset);
+      }
+      return;
+    }
+    
+    // Track 2+ (PiP Tracks): Apply transforms if canvasNode exists
+    if (canvasNode) {
+      this.ctx.save();
+      
+      // Set opacity
+      this.ctx.globalAlpha = canvasNode.opacity;
+      
+      // Apply transforms: Translate → Rotate → Scale
+      // Translate to position
+      this.ctx.translate(canvasNode.x + canvasNode.width / 2, canvasNode.y + canvasNode.height / 2);
+      
+      // Rotate (convert degrees to radians)
+      this.ctx.rotate((canvasNode.rotation * Math.PI) / 180);
+      
+      // Scale based on canvasNode dimensions vs original asset dimensions
+      const originalWidth = asset.metadata.width || this.canvas.width;
+      const originalHeight = asset.metadata.height || this.canvas.height;
+      const scaleX = canvasNode.width / originalWidth;
+      const scaleY = canvasNode.height / originalHeight;
+      this.ctx.scale(scaleX, scaleY);
+      
+      // Render clip centered at origin (since we translated to center)
+      if (asset.type === 'video') {
+        this.renderVideoTransformed(clip, asset, -originalWidth / 2, -originalHeight / 2);
+      } else if (asset.type === 'image') {
+        this.renderImageTransformed(clip, asset, -originalWidth / 2, -originalHeight / 2);
+      }
+      
+      this.ctx.restore();
+    } else {
+      // Fallback: render without transforms if canvasNode missing
+      if (asset.type === 'video') {
+        this.renderVideo(clip, asset);
+      } else if (asset.type === 'image') {
+        this.renderImage(clip, asset);
+      }
     }
   }
 
   /**
-   * Render a video clip
+   * Render a video clip (full-screen for main track)
    */
   private renderVideo(clip: Clip, asset: Asset): void {
     if (!this.ctx || !this.canvas) return;
@@ -190,7 +233,7 @@ export class CanvasCompositor {
       return; // Not ready yet
     }
     
-    // Draw video frame to canvas
+    // Draw video frame to canvas (full-screen)
     try {
       // If video has dimensions, draw it
       if (video.videoWidth > 0 && video.videoHeight > 0) {
@@ -206,7 +249,37 @@ export class CanvasCompositor {
   }
 
   /**
-   * Render an image clip
+   * Render a video clip with transforms (for PiP tracks)
+   */
+  private renderVideoTransformed(clip: Clip, asset: Asset, x: number, y: number): void {
+    if (!this.ctx || !this.canvas) return;
+    
+    const video = videoPoolManager.getVideo(asset.id);
+    if (!video) {
+      return; // Video not loaded yet
+    }
+    
+    if (video.readyState < 1) {
+      return; // Not ready yet
+    }
+    
+    try {
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        const width = asset.metadata.width || video.videoWidth;
+        const height = asset.metadata.height || video.videoHeight;
+        this.ctx.drawImage(
+          video,
+          0, 0, video.videoWidth, video.videoHeight, // Source rectangle
+          x, y, width, height // Destination rectangle
+        );
+      }
+    } catch (error) {
+      // Silently ignore - video might not be ready yet
+    }
+  }
+
+  /**
+   * Render an image clip (full-screen for main track)
    */
   private renderImage(clip: Clip, asset: Asset): void {
     if (!this.ctx || !this.canvas) return;
@@ -263,6 +336,46 @@ export class CanvasCompositor {
           img,
           0, 0, img.naturalWidth, img.naturalHeight, // Source rectangle
           drawX, drawY, drawWidth, drawHeight // Destination rectangle (centered, aspect-preserved)
+        );
+      } catch (error) {
+        console.error(`Error drawing image for ${asset.id}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Render an image clip with transforms (for PiP tracks)
+   */
+  private renderImageTransformed(clip: Clip, asset: Asset, x: number, y: number): void {
+    if (!this.ctx || !this.canvas) return;
+    
+    // Get or create cached image
+    let img = this.imageCache.get(asset.id);
+    
+    if (!img) {
+      img = new Image();
+      img.src = asset.url;
+      this.imageCache.set(asset.id, img);
+      
+      img.onload = () => {
+        if (!this.isPlaying && this.canvas && this.ctx) {
+          this.renderFrame();
+        }
+      };
+      
+      img.onerror = (e) => {
+        console.error(`Failed to load image ${asset.name}:`, e);
+      };
+    }
+    
+    if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+      try {
+        const width = asset.metadata.width || img.naturalWidth;
+        const height = asset.metadata.height || img.naturalHeight;
+        this.ctx.drawImage(
+          img,
+          0, 0, img.naturalWidth, img.naturalHeight, // Source rectangle
+          x, y, width, height // Destination rectangle
         );
       } catch (error) {
         console.error(`Error drawing image for ${asset.id}:`, error);

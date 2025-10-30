@@ -36,7 +36,7 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 - [x] better trim
 - [ ] multiple tracks (main + overlay/PiP)
 - [ ] webm?
-- [ ] fix export resolution
+- [x] fix export resolution
 - [x] Webcam recording (access system camera)
 - [ ] Simultaneous screen + webcam (picture-in-picture style)
 - [x] Audio capture from microphone
@@ -73,7 +73,7 @@ We'll test your app with:
 ## other
 - [ ] generated captions
 - [ ] text custom fonts and animations
-- [ ] hide scrolllbars unless actively scrolling
+- [x] hide scrolllbars unless actively scrolling
 - [ ] upload export to cloud storage
 - [ ] transitions between clips
 - [ ] audio controls
@@ -84,7 +84,7 @@ We'll test your app with:
 
 ## very extra
 
-- [ ] cosmic asset generation specifically
+- [x] cosmic asset generation specifically
 - [ ] integrate with other Starscape
 
 

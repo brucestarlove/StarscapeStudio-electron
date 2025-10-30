@@ -83,9 +83,11 @@ export function GenerateCosmicImageDialog({ open, onOpenChange }: GenerateCosmic
           <DialogTitle className="text-h3 font-semibold text-white">
             Generate Cosmic Image
           </DialogTitle>
-          <DialogDescription className="text-body text-white/70">
-            Describe what you'd like to see. We'll add a celestial theme with space, nebulas, starfields, or other cosmic elements.
-          </DialogDescription>
+          {generationState !== 'success' && (
+            <DialogDescription className="text-body text-white/70">
+              Describe what you'd like to see. We'll add a celestial theme with space, nebulas, starfields, or other cosmic elements.
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         <div className="space-y-lg py-4">
@@ -127,6 +129,14 @@ export function GenerateCosmicImageDialog({ open, onOpenChange }: GenerateCosmic
           {/* Generated Image Preview */}
           {generationState === 'success' && generatedImagePath && (
             <div className="space-y-sm">
+              <div className="space-y-xs">
+                <label className="text-xs font-medium text-white/60 uppercase tracking-wide">
+                  Your Prompt
+                </label>
+                <p className="text-body text-white/90 italic">
+                  {prompt}
+                </p>
+              </div>
               <label className="text-sm font-medium text-white/80">
                 Generated Image
               </label>
