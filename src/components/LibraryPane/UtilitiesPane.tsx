@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle, ChevronLeft } from "lucide-react";
 import { WebcamRecordingDialog } from "./WebcamRecordingDialog";
+import { MicrophoneRecordingDialog } from "./MicrophoneRecordingDialog";
 
 export function UtilitiesPane() {
   const { setLeftPaneCollapsed, setActiveLeftPaneTab } = useUiStore();
@@ -21,6 +22,9 @@ export function UtilitiesPane() {
   
   // Webcam recording dialog state
   const [webcamDialogOpen, setWebcamDialogOpen] = useState(false);
+  
+  // Microphone recording dialog state
+  const [microphoneDialogOpen, setMicrophoneDialogOpen] = useState(false);
 
   // Append log message for debugging
   const append = (msg: unknown) => setLogs((l) => l + "\n" + JSON.stringify(msg));
@@ -158,9 +162,9 @@ export function UtilitiesPane() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-md space-y-md">
-            {/* Screen Recording Section */}
+            {/* Recording Section */}
             <div className="space-y-sm">
-              <h3 className="text-sm font-semibold text-white/80">Screen Recording</h3>
+              <h3 className="text-sm font-semibold text-white/80">Record</h3>
               <Button
                 onClick={handleRecordToggle}
                 className={`w-full py-2 rounded transition-all ${
@@ -171,16 +175,17 @@ export function UtilitiesPane() {
               >
                 {recordingId ? '⏹ Stop Recording' : '⏥ Start Recording'}
               </Button>
-            </div>
-
-            {/* Webcam Recording Section */}
-            <div className="space-y-sm">
-              <h3 className="text-sm font-semibold text-white/80">Webcam Recording</h3>
               <Button
                 onClick={() => setWebcamDialogOpen(true)}
                 className="w-full py-2 bg-gradient-cyan-purple text-white hover:opacity-90 rounded transition-all"
               >
                 📹 Record Webcam
+              </Button>
+              <Button
+                onClick={() => setMicrophoneDialogOpen(true)}
+                className="w-full py-2 bg-gradient-cyan-purple text-white hover:opacity-90 rounded transition-all"
+              >
+                🎤 Record Microphone
               </Button>
             </div>
 
@@ -192,12 +197,6 @@ export function UtilitiesPane() {
                 className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
               >
                 Screen + Webcam Recording
-              </Button>
-              <Button
-                disabled
-                className="w-full py-2 bg-white/10 text-white/50 rounded cursor-not-allowed"
-              >
-                Microphone Recording
               </Button>
             </div>
 
@@ -217,6 +216,12 @@ export function UtilitiesPane() {
       <WebcamRecordingDialog 
         open={webcamDialogOpen}
         onOpenChange={setWebcamDialogOpen}
+      />
+
+      {/* Microphone Recording Dialog */}
+      <MicrophoneRecordingDialog 
+        open={microphoneDialogOpen}
+        onOpenChange={setMicrophoneDialogOpen}
       />
 
       {/* Success Modal */}

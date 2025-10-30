@@ -14,6 +14,11 @@ async function executeExportJob(plan, settings, cache, mainWindow, trackProcessF
   const segmentPaths = [];
   let segmentIndex = 0;
 
+  // Extract resolution settings (width: -1, height: -1 means use source resolution)
+  const targetWidth = settings.width;
+  const targetHeight = settings.height;
+  const useSourceResolution = targetWidth === -1 || targetHeight === -1;
+
   // Step 1: Process each clip and gaps between them
   for (let idx = 0; idx < plan.mainTrack.length; idx++) {
     const clip = plan.mainTrack[idx];
@@ -37,7 +42,7 @@ async function executeExportJob(plan, settings, cache, mainWindow, trackProcessF
           }
 
           const gapPath = cache.segmentPath(segmentIndex++);
-          await createBlackSegment(gapPath, gapDurationMs / 1000, trackProcessFn);
+          await createBlackSegment(gapPath, gapDurationMs / 1000, targetWidth, targetHeight, trackProcessFn);
           segmentPaths.push(gapPath);
           current++;
         } catch (err) {
@@ -62,15 +67,24 @@ async function executeExportJob(plan, settings, cache, mainWindow, trackProcessF
     const startSec = clip.inMs / 1000;
     const durationSec = (clip.outMs - clip.inMs) / 1000;
 
-    // Try codec copy first
-    try {
-      await trimSegment(clip.srcPath, segPath, startSec, durationSec, true, trackProcessFn);
+    // If we need to scale, we must transcode (can't use codec copy)
+    const needsScaling = !useSourceResolution;
+    
+    if (needsScaling) {
+      // Must transcode to apply scaling
+      await trimSegment(clip.srcPath, segPath, startSec, durationSec, false, targetWidth, targetHeight, settings.bitrate, trackProcessFn);
       segmentPaths.push(segPath);
-    } catch (err) {
-      // Fallback to transcode
-      console.log(`Codec copy failed for segment ${idx}, transcoding...`);
-      await trimSegment(clip.srcPath, segPath, startSec, durationSec, false, trackProcessFn);
-      segmentPaths.push(segPath);
+    } else {
+      // Try codec copy first for source resolution
+      try {
+        await trimSegment(clip.srcPath, segPath, startSec, durationSec, true, null, null, settings.bitrate, trackProcessFn);
+        segmentPaths.push(segPath);
+      } catch (err) {
+        // Fallback to transcode
+        console.log(`Codec copy failed for segment ${idx}, transcoding...`);
+        await trimSegment(clip.srcPath, segPath, startSec, durationSec, false, null, null, settings.bitrate, trackProcessFn);
+        segmentPaths.push(segPath);
+      }
     }
 
     current++;
@@ -106,13 +120,14 @@ async function executeExportJob(plan, settings, cache, mainWindow, trackProcessF
   const ext = settings.format === 'mov' ? 'mov' : 'mp4';
   const outPath = settings.filename ? cache.renderOutputPathWithFilename(settings.filename, ext) : cache.renderOutputPath(plan.id, ext);
 
-  // Try concat with codec copy
+  // If we're scaling, we already transcoded all segments to the target resolution
+  // so we can use codec copy for concat. If using source resolution, try codec copy first.
   try {
-    await concatenateSegments(concatPath, outPath, true, trackProcessFn);
+    await concatenateSegments(concatPath, outPath, true, null, null, settings.bitrate, trackProcessFn);
   } catch (err) {
     // Fallback to re-encode
     console.log('Concat with copy failed, re-encoding...');
-    await concatenateSegments(concatPath, outPath, false, trackProcessFn);
+    await concatenateSegments(concatPath, outPath, false, targetWidth, targetHeight, settings.bitrate, trackProcessFn);
   }
 
   current++;
@@ -136,9 +151,12 @@ async function executeExportJob(plan, settings, cache, mainWindow, trackProcessF
  * Create a black video segment (for gaps)
  * If lavfi is not available, this will fail and we'll skip gaps
  */
-async function createBlackSegment(outputPath, durationSec, trackProcessFn) {
+async function createBlackSegment(outputPath, durationSec, width, height, trackProcessFn) {
   const path = require('path');
   const os = require('os');
+  
+  // Use provided resolution, or default to 1920x1080
+  const resolutionStr = `${width}x${height}`;
   
   // Try multiple approaches in order of compatibility
   const approaches = [
@@ -149,7 +167,7 @@ async function createBlackSegment(outputPath, durationSec, trackProcessFn) {
         
         // Build raw ffmpeg command for maximum compatibility
         command
-          .input('color=black:s=1920x1080:r=30')
+          .input(`color=black:s=${resolutionStr}:r=30`)
           .inputFormat('lavfi')
           .input('anullsrc=r=48000:cl=stereo')
           .inputFormat('lavfi')
@@ -196,20 +214,35 @@ async function createBlackSegment(outputPath, durationSec, trackProcessFn) {
 
 /**
  * Trim a single segment
+ * @param {string} inputPath - Input video file path
+ * @param {string} outputPath - Output video file path
+ * @param {number} startSec - Start time in seconds
+ * @param {number} durationSec - Duration in seconds
+ * @param {boolean} copyCodec - Whether to use codec copy (no re-encoding)
+ * @param {number|null} targetWidth - Target width (null for source resolution)
+ * @param {number|null} targetHeight - Target height (null for source resolution)
+ * @param {number} bitrate - Video bitrate in kbps
+ * @param {Function} trackProcessFn - Function to track ffmpeg process
  */
-function trimSegment(inputPath, outputPath, startSec, durationSec, copyCodec, trackProcessFn) {
+function trimSegment(inputPath, outputPath, startSec, durationSec, copyCodec, targetWidth, targetHeight, bitrate, trackProcessFn) {
   return new Promise((resolve, reject) => {
     const command = ffmpeg(inputPath).seekInput(startSec).duration(durationSec);
 
     if (copyCodec) {
       command.outputOptions(['-c copy']);
     } else {
+      // Apply scaling if target resolution is specified
+      if (targetWidth && targetHeight) {
+        command.size(`${targetWidth}x${targetHeight}`);
+      }
+      
       command
         .videoCodec('libx264')
         .audioCodec('aac')
         .outputOptions([
           '-preset veryfast',
           '-crf 23',
+          `-b:v ${bitrate}k`,
           '-b:a 192k',
         ]);
     }
@@ -233,8 +266,15 @@ function trimSegment(inputPath, outputPath, startSec, durationSec, copyCodec, tr
 
 /**
  * Concatenate segments
+ * @param {string} concatListPath - Path to concat list file
+ * @param {string} outputPath - Output video file path
+ * @param {boolean} copyCodec - Whether to use codec copy (no re-encoding)
+ * @param {number|null} targetWidth - Target width (null for source resolution)
+ * @param {number|null} targetHeight - Target height (null for source resolution)
+ * @param {number} bitrate - Video bitrate in kbps
+ * @param {Function} trackProcessFn - Function to track ffmpeg process
  */
-function concatenateSegments(concatListPath, outputPath, copyCodec, trackProcessFn) {
+function concatenateSegments(concatListPath, outputPath, copyCodec, targetWidth, targetHeight, bitrate, trackProcessFn) {
   return new Promise((resolve, reject) => {
     const command = ffmpeg()
       .input(concatListPath)
@@ -243,12 +283,18 @@ function concatenateSegments(concatListPath, outputPath, copyCodec, trackProcess
     if (copyCodec) {
       command.outputOptions(['-c copy']);
     } else {
+      // Apply scaling if target resolution is specified
+      if (targetWidth && targetHeight) {
+        command.size(`${targetWidth}x${targetHeight}`);
+      }
+      
       command
         .videoCodec('libx264')
         .audioCodec('aac')
         .outputOptions([
           '-preset veryfast',
           '-crf 23',
+          `-b:v ${bitrate}k`,
           '-b:a 192k',
         ]);
     }

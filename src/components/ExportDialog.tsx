@@ -132,7 +132,7 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
   const resolutionOptions = [
     { value: '720p', label: '720p (1280x720)', width: 1280, height: 720 },
     { value: '1080p', label: '1080p (1920x1080)', width: 1920, height: 1080 },
-    { value: 'source', label: 'Source Resolution', width: 1920, height: 1080 },
+    { value: 'source', label: 'Source Resolution', width: -1, height: -1 }, // -1 indicates source resolution
   ];
 
   const qualityOptions = [
@@ -179,7 +179,7 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
                   {resolutionOptions.map((option) => (
                     <Button
                       key={option.value}
-                      variant={settings.width === option.width ? "default" : "outline"}
+                      variant={settings.width === option.width && settings.height === option.height ? "default" : "outline"}
                       size="sm"
                       onClick={() => setSettings(prev => ({ 
                         ...prev, 

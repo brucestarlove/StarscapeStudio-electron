@@ -33,14 +33,14 @@ Build the best, most well-engineered frontend you can, supporting the MVP.
 - [x] smooth seek header interactivity
 
 ## remaining for final
-- [ ] better trim
+- [x] better trim
 - [ ] multiple tracks (main + overlay/PiP)
 - [ ] webm?
 - [ ] fix export resolution
 - [x] Webcam recording (access system camera)
 - [ ] Simultaneous screen + webcam (picture-in-picture style)
-- [ ] Audio capture from microphone
-- [ ] Record, stop, and save recordings directly to timeline
+- [x] Audio capture from microphone
+- [x] Record, stop, and save recordings directly to timeline
 - [ ] progress indicator during export
 
 ## stretch goals

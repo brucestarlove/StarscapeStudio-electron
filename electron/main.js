@@ -558,7 +558,45 @@ function convertWebmToMp4(inputPath, outputPath) {
 }
 
 /**
- * Save blob data to file (converts WebM to MP4 for screen recordings)
+ * Convert WebM audio to MP3 using ffmpeg
+ */
+function convertWebmToMp3(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = require('fluent-ffmpeg');
+    
+    console.log(`Converting WebM audio to MP3: ${inputPath} -> ${outputPath}`);
+    
+    const command = ffmpeg(inputPath)
+      .audioCodec('libmp3lame')
+      .audioBitrate('192k')
+      .audioChannels(2)
+      .audioFrequency(44100)
+      .output(outputPath)
+      .on('start', (commandLine) => {
+        console.log('FFmpeg command:', commandLine);
+      })
+      .on('progress', (progress) => {
+        if (progress.percent) {
+          console.log(`Conversion progress: ${Math.round(progress.percent)}%`);
+        }
+      })
+      .on('end', () => {
+        console.log('WebM to MP3 conversion completed');
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error('Conversion error:', err);
+        reject(new Error(`FFmpeg audio conversion failed: ${err.message}`));
+      });
+    
+    // Track the process
+    const process = command.run();
+    trackProcess(process);
+  });
+}
+
+/**
+ * Save blob data to file (converts WebM to MP4 for video, MP3 for audio)
  */
 ipcMain.handle('save-blob-to-file', async (event, blobData, filename) => {
   try {
@@ -568,21 +606,37 @@ ipcMain.handle('save-blob-to-file', async (event, blobData, filename) => {
     
     // Construct full path in cache/media directory
     const webmPath = path.join(cacheDirs.mediaDir, filename);
-    const mp4Filename = filename.replace('.webm', '.mp4');
-    const mp4Path = path.join(cacheDirs.mediaDir, mp4Filename);
     
     // Save the blob to the webm file
     await fs.promises.writeFile(webmPath, buffer);
     console.log(`Saved WebM recording to: ${webmPath}`);
     
-    // Convert WebM to MP4 for better compatibility
-    await convertWebmToMp4(webmPath, mp4Path);
-    
-    // Delete the original WebM file
-    await fs.promises.unlink(webmPath);
-    console.log(`Deleted temporary WebM file: ${webmPath}`);
-    
-    return { success: true, path: mp4Path };
+    // Check if it's a microphone recording (audio-only) by filename
+    if (filename.startsWith('microphone_recording_')) {
+      // For audio recordings, convert to MP3
+      const mp3Filename = filename.replace('.webm', '.mp3');
+      const mp3Path = path.join(cacheDirs.mediaDir, mp3Filename);
+      
+      await convertWebmToMp3(webmPath, mp3Path);
+      
+      // Delete the original WebM file
+      await fs.promises.unlink(webmPath);
+      console.log(`Deleted temporary WebM file: ${webmPath}`);
+      
+      return { success: true, path: mp3Path };
+    } else {
+      // For video recordings (webcam/screen), convert to MP4
+      const mp4Filename = filename.replace('.webm', '.mp4');
+      const mp4Path = path.join(cacheDirs.mediaDir, mp4Filename);
+      
+      await convertWebmToMp4(webmPath, mp4Path);
+      
+      // Delete the original WebM file
+      await fs.promises.unlink(webmPath);
+      console.log(`Deleted temporary WebM file: ${webmPath}`);
+      
+      return { success: true, path: mp4Path };
+    }
   } catch (error) {
     throw new Error(`Failed to save blob to file: ${error.message}`);
   }
